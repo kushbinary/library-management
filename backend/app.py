@@ -120,18 +120,48 @@ class Student(db.Model):
 
 # ==================== Database Auto-Initialization ====================
 
+def init_db():
+    try:
+        db.create_all()
+        # Create default admin account if not already created
+        default_admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
+        default_admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
+        existing_admin = AdminUser.query.filter_by(username=default_admin_username).first()
+        if not existing_admin:
+            new_admin = AdminUser(username=default_admin_username)
+            new_admin.set_password(default_admin_password)
+            db.session.add(new_admin)
+            db.session.commit()
+            print(f"[AUTH] Default admin created -> Username: {default_admin_username}")
+    except Exception as e:
+        db.session.rollback()
+        print(f"[DB INIT ERROR] {e}")
+
 with app.app_context():
-    db.create_all()
-    # Create default admin account if not already created
-    default_admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
-    default_admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
-    existing_admin = AdminUser.query.filter_by(username=default_admin_username).first()
-    if not existing_admin:
-        new_admin = AdminUser(username=default_admin_username)
-        new_admin.set_password(default_admin_password)
-        db.session.add(new_admin)
-        db.session.commit()
-        print(f"[AUTH] Default admin created -> Username: {default_admin_username}")
+    init_db()
+
+@app.route('/init-db')
+def manual_init_db():
+    try:
+        db.create_all()
+        default_admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
+        default_admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
+        existing_admin = AdminUser.query.filter_by(username=default_admin_username).first()
+        if not existing_admin:
+            new_admin = AdminUser(username=default_admin_username)
+            new_admin.set_password(default_admin_password)
+            db.session.add(new_admin)
+            db.session.commit()
+        return jsonify({
+            "status": "success",
+            "message": "Database tables created and admin user initialized successfully!"
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "status": "error",
+            "message": f"Database initialization failed: {str(e)}"
+        }), 500
 
 
 # ==================== Authentication Decorator ====================
