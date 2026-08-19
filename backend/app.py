@@ -2,9 +2,9 @@
 Library Management Application - Backend API & Cloud Portal
 
 Features:
-- Cloud-ready Database (PostgreSQL & SQLite auto-fallback)
+- Cloud-ready Database (Neon PostgreSQL & SQLite auto-fallback)
 - User Authentication (Admin Login, Password hashing & session protection)
-- Student registration & seat management with admission details
+- Student registration & seat management with admission details & fee tracking
 - WhatsApp integration via Twilio
 - Expiry notification tracking & cron endpoints
 - REST API for Mobile App synchronization
@@ -68,24 +68,34 @@ class Student(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(120), nullable=False)
+    email = db.Column(db.String(120), nullable=True, default='')
     phone = db.Column(db.String(20), nullable=False)
     admission_date = db.Column(db.Date, nullable=False, default=datetime.date.today)
     timing = db.Column(db.String(50), nullable=False)
-    seat_number = db.Column(db.String(20), nullable=False, unique=True)
+    seat_number = db.Column(db.String(20), nullable=False)
     expiry_date = db.Column(db.Date, nullable=False)
+    total_fee = db.Column(db.Float, default=1000.0)
+    paid_amount = db.Column(db.Float, default=1000.0)
+    due_amount = db.Column(db.Float, default=0.0)
+    payment_mode = db.Column(db.String(50), default='UPI')
+    payment_status = db.Column(db.String(50), default='Paid')
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
     def to_dict(self):
         return {
             'id': self.id,
             'name': self.name,
-            'email': self.email,
+            'email': self.email or '',
             'phone': self.phone,
             'admission_date': self.admission_date.strftime('%Y-%m-%d') if self.admission_date else None,
             'timing': self.timing,
             'seat_number': self.seat_number,
             'expiry_date': self.expiry_date.strftime('%Y-%m-%d') if self.expiry_date else None,
+            'total_fee': float(self.total_fee or 1000.0),
+            'paid_amount': float(self.paid_amount or 1000.0),
+            'due_amount': float(self.due_amount or 0.0),
+            'payment_mode': self.payment_mode or 'UPI',
+            'payment_status': self.payment_status or 'Paid',
             'days_remaining': self.days_remaining(),
             'is_expired': self.is_expired(),
             'seat_status': self.get_seat_status()
@@ -238,24 +248,23 @@ def student_list():
 def add_student():
     if request.method == 'POST':
         name = request.form.get('name')
-        email = request.form.get('email')
+        email = request.form.get('email', '')
         phone = request.form.get('phone')
         admission_date_str = request.form.get('admission_date')
         timing = request.form.get('timing')
         seat_number = request.form.get('seat_number')
         expiry_date_str = request.form.get('expiry_date')
+        total_fee = float(request.form.get('total_fee', 1000.0) or 1000.0)
+        paid_amount = float(request.form.get('paid_amount', 1000.0) or 1000.0)
+        due_amount = max(0.0, total_fee - paid_amount)
+        payment_mode = request.form.get('payment_mode', 'UPI')
+        payment_status = 'Paid' if due_amount <= 0 else ('Due' if paid_amount <= 0 else 'Partial')
 
         try:
             admission_date = datetime.datetime.strptime(admission_date_str, '%Y-%m-%d').date()
             expiry_date = datetime.datetime.strptime(expiry_date_str, '%Y-%m-%d').date()
         except (ValueError, TypeError):
             flash('Invalid date format. Please select valid dates.', 'danger')
-            return render_template('add_student.html')
-
-        # Check if seat is already occupied
-        existing_seat = Student.query.filter_by(seat_number=seat_number).first()
-        if existing_seat:
-            flash(f'Seat {seat_number} is already assigned to {existing_seat.name}. Please pick another seat.', 'danger')
             return render_template('add_student.html')
 
         student = Student(
@@ -265,7 +274,12 @@ def add_student():
             admission_date=admission_date,
             timing=timing,
             seat_number=seat_number,
-            expiry_date=expiry_date
+            expiry_date=expiry_date,
+            total_fee=total_fee,
+            paid_amount=paid_amount,
+            due_amount=due_amount,
+            payment_mode=payment_mode,
+            payment_status=payment_status
         )
         db.session.add(student)
         db.session.commit()
@@ -352,7 +366,7 @@ def api_get_students():
 @app.route('/api/students', methods=['POST'])
 def api_add_student():
     data = request.json or {}
-    required_fields = ['name', 'email', 'phone', 'admission_date', 'timing', 'seat_number', 'expiry_date']
+    required_fields = ['name', 'phone', 'admission_date', 'timing', 'seat_number', 'expiry_date']
     missing = [f for f in required_fields if not data.get(f)]
 
     if missing:
@@ -364,20 +378,64 @@ def api_add_student():
     except (ValueError, TypeError):
         return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD.'}), 400
 
+    total_fee = float(data.get('total_fee') or data.get('totalFee') or 1000.0)
+    paid_amount = float(data.get('paid_amount') or data.get('paidAmount') or total_fee)
+    due_amount = max(0.0, total_fee - paid_amount)
+    payment_mode = data.get('payment_mode') or data.get('paymentMode') or 'UPI'
+    payment_status = data.get('payment_status') or data.get('paymentStatus') or ('Paid' if due_amount <= 0 else ('Due' if paid_amount <= 0 else 'Partial'))
+
     student = Student(
         name=data['name'],
-        email=data['email'],
+        email=data.get('email', ''),
         phone=data['phone'],
         admission_date=admission_date,
         timing=data['timing'],
         seat_number=data['seat_number'],
-        expiry_date=expiry_date
+        expiry_date=expiry_date,
+        total_fee=total_fee,
+        paid_amount=paid_amount,
+        due_amount=due_amount,
+        payment_mode=payment_mode,
+        payment_status=payment_status
     )
     db.session.add(student)
     db.session.commit()
 
     send_whatsapp_message(student.name, student.phone, 'registration')
     return jsonify({'message': 'Student registered!', 'student': student.to_dict()}), 201
+
+
+@app.route('/api/students/<int:student_id>', methods=['PUT'])
+def api_update_student(student_id):
+    student = db.get_or_404(Student, student_id)
+    data = request.json or {}
+
+    if 'name' in data: student.name = data['name']
+    if 'phone' in data: student.phone = data['phone']
+    if 'timing' in data: student.timing = data['timing']
+    if 'seat_number' in data: student.seat_number = data['seat_number']
+    if 'admission_date' in data:
+        try: student.admission_date = datetime.datetime.strptime(data['admission_date'], '%Y-%m-%d').date()
+        except: pass
+    if 'expiry_date' in data:
+        try: student.expiry_date = datetime.datetime.strptime(data['expiry_date'], '%Y-%m-%d').date()
+        except: pass
+    if 'total_fee' in data: student.total_fee = float(data['total_fee'])
+    if 'paid_amount' in data: student.paid_amount = float(data['paid_amount'])
+    if 'due_amount' in data: student.due_amount = float(data['due_amount'])
+    if 'payment_mode' in data: student.payment_mode = data['payment_mode']
+    if 'payment_status' in data: student.payment_status = data['payment_status']
+
+    db.session.commit()
+    return jsonify({'message': 'Student updated successfully', 'student': student.to_dict()})
+
+
+@app.route('/api/students/<int:student_id>', methods=['DELETE'])
+def api_delete_student(student_id):
+    student = db.get_or_404(Student, student_id)
+    db.session.delete(student)
+    db.session.commit()
+    return jsonify({'message': 'Student deleted successfully'})
 
 
 @app.route('/api/expired_students', methods=['GET'])

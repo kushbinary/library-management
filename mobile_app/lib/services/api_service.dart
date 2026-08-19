@@ -1,82 +1,83 @@
 import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/student.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://127.0.0.1:5000/api';
+  // Default Render Cloud Server URL
+  static const String defaultBaseUrl = 'https://library-management-1-k8m.onrender.com/api';
 
-  // Starter sample data for master account
-  static List<Student> _getStarterDataForAdmin() {
-    final now = DateTime.now();
-    final thisMonthStr = DateFormat('yyyy-MM-dd').format(now);
-    final nextMonthStr = DateFormat('yyyy-MM-dd').format(now.add(const Duration(days: 30)));
-    final pastMonthStr = DateFormat('yyyy-MM-dd').format(now.subtract(const Duration(days: 40)));
-    final expiredStr = DateFormat('yyyy-MM-dd').format(now.subtract(const Duration(days: 5)));
+  static Future<String> getBaseUrl() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('custom_server_api_url') ?? defaultBaseUrl;
+    } catch (_) {
+      return defaultBaseUrl;
+    }
+  }
 
-    return [
-      Student(
-        id: 1,
-        name: 'Aarav Sharma',
-        phone: '9876543210',
-        admissionDate: thisMonthStr,
-        timing: 'Morning (8 AM - 12 PM)',
-        seatNumber: 'A-12',
-        expiryDate: nextMonthStr,
-        totalFee: 1000.0,
-        paidAmount: 1000.0,
-        dueAmount: 0.0,
-        paymentMode: 'UPI (GPay)',
-        paymentStatus: 'Paid',
-        daysRemaining: 30,
-        isExpired: false,
-      ),
-      Student(
-        id: 2,
-        name: 'Priya Verma',
-        phone: '9812345678',
-        admissionDate: thisMonthStr,
-        timing: 'Evening (4 PM - 8 PM)',
-        seatNumber: 'B-04',
-        expiryDate: nextMonthStr,
-        totalFee: 1200.0,
-        paidAmount: 800.0,
-        dueAmount: 400.0,
-        paymentMode: 'Cash',
-        paymentStatus: 'Partial',
-        daysRemaining: 28,
-        isExpired: false,
-      ),
-      Student(
-        id: 3,
-        name: 'Rohan Gupta',
-        phone: '9988776655',
-        admissionDate: pastMonthStr,
-        timing: 'Full Day (8 AM - 8 PM)',
-        seatNumber: 'C-01',
-        expiryDate: expiredStr,
-        totalFee: 1500.0,
-        paidAmount: 1500.0,
-        dueAmount: 0.0,
-        paymentMode: 'UPI (PhonePe)',
-        paymentStatus: 'Paid',
-        daysRemaining: 0,
-        isExpired: true,
-      ),
-    ];
+  static Future<void> setCustomBaseUrl(String url) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('custom_server_api_url', url.trim());
   }
 
   static String _storageKey(String username) {
     return 'library_students_user_${username.toLowerCase().trim()}';
   }
 
-  // Get isolated students list for the logged-in user
-  static Future<List<Student>> getStudentsForUser(String username) async {
+  // Login with Cloud Server
+  static Future<bool> loginToServer(String username, String password) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final key = _storageKey(username);
-      final raw = prefs.getString(key);
+      final baseUrl = await getBaseUrl();
+      final response = await http.post(
+        Uri.parse('$baseUrl/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'username': username.trim(),
+          'password': password,
+        }),
+      ).timeout(const Duration(seconds: 8));
 
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['success'] == true;
+      }
+    } catch (e) {
+      // Offline fallback: check locally registered accounts
+    }
+    return false;
+  }
+
+  // Get students list from Cloud Server (with offline cache fallback)
+  static Future<List<Student>> getStudentsForUser(String username) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = _storageKey(username);
+
+    try {
+      final baseUrl = await getBaseUrl();
+      final response = await http.get(
+        Uri.parse('$baseUrl/students'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> list = json.decode(response.body);
+        final students = list.map((item) => Student.fromJson(item)).toList();
+
+        // Update local cache
+        final jsonList = students.map((s) => s.toJson()).toList();
+        await prefs.setString(key, json.encode(jsonList));
+
+        return students;
+      }
+    } catch (e) {
+      // Server offline or network issue: read from local cache
+    }
+
+    // Read from local cache
+    try {
+      final raw = prefs.getString(key);
       if (raw != null) {
         final List<dynamic> list = json.decode(raw);
         final today = DateTime.now();
@@ -106,65 +107,119 @@ class ApiService {
           );
         }).toList();
       }
-
-      if (username.toLowerCase() == 'kushbinary') {
-        final seed = _getStarterDataForAdmin();
-        await saveStudentsForUser(username, seed);
-        return seed;
-      }
     } catch (_) {}
 
     return [];
   }
 
-  static Future<bool> saveStudentsForUser(String username, List<Student> students) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final key = _storageKey(username);
-      final jsonList = students.map((s) => s.toJson()).toList();
-      return await prefs.setString(key, json.encode(jsonList));
-    } catch (_) {
-      return false;
-    }
-  }
-
+  // Add new student to Cloud Server and local cache
   static Future<bool> addStudentForUser(String username, Student student) async {
-    final list = await getStudentsForUser(username);
-    final newStudent = Student(
-      id: DateTime.now().millisecondsSinceEpoch,
-      name: student.name,
-      phone: student.phone,
-      admissionDate: student.admissionDate,
-      timing: student.timing,
-      seatNumber: student.seatNumber,
-      expiryDate: student.expiryDate,
-      totalFee: student.totalFee,
-      paidAmount: student.paidAmount,
-      dueAmount: student.dueAmount,
-      paymentMode: student.paymentMode,
-      paymentStatus: student.paymentStatus,
-      daysRemaining: 30,
-      isExpired: false,
-    );
-    list.insert(0, newStudent);
-    return await saveStudentsForUser(username, list);
+    final prefs = await SharedPreferences.getInstance();
+    final key = _storageKey(username);
+
+    bool serverSuccess = false;
+    Student savedStudent = student;
+
+    try {
+      final baseUrl = await getBaseUrl();
+      final response = await http.post(
+        Uri.parse('$baseUrl/students'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(student.toJson()),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['student'] != null) {
+          savedStudent = Student.fromJson(data['student']);
+          serverSuccess = true;
+        }
+      }
+    } catch (e) {
+      // Server timed out or network error; save locally
+    }
+
+    // Update local cache
+    try {
+      final list = await getStudentsForUser(username);
+      final newStudent = Student(
+        id: savedStudent.id ?? DateTime.now().millisecondsSinceEpoch,
+        name: savedStudent.name,
+        phone: savedStudent.phone,
+        admissionDate: savedStudent.admissionDate,
+        timing: savedStudent.timing,
+        seatNumber: savedStudent.seatNumber,
+        expiryDate: savedStudent.expiryDate,
+        totalFee: savedStudent.totalFee,
+        paidAmount: savedStudent.paidAmount,
+        dueAmount: savedStudent.dueAmount,
+        paymentMode: savedStudent.paymentMode,
+        paymentStatus: savedStudent.paymentStatus,
+        daysRemaining: 30,
+        isExpired: false,
+      );
+      list.removeWhere((s) => s.id == newStudent.id);
+      list.insert(0, newStudent);
+      final jsonList = list.map((s) => s.toJson()).toList();
+      await prefs.setString(key, json.encode(jsonList));
+      return true;
+    } catch (_) {
+      return serverSuccess;
+    }
   }
 
-  // Update existing student (e.g. collecting due fee, changing seat, extending validity)
+  // Update student on Cloud Server & local cache
   static Future<bool> updateStudentForUser(String username, Student student) async {
-    final list = await getStudentsForUser(username);
-    final index = list.indexWhere((s) => s.id == student.id);
-    if (index != -1) {
-      list[index] = student;
-      return await saveStudentsForUser(username, list);
+    final prefs = await SharedPreferences.getInstance();
+    final key = _storageKey(username);
+
+    if (student.id != null) {
+      try {
+        final baseUrl = await getBaseUrl();
+        await http.put(
+          Uri.parse('$baseUrl/students/${student.id}'),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode(student.toJson()),
+        ).timeout(const Duration(seconds: 8));
+      } catch (_) {}
     }
+
+    try {
+      final list = await getStudentsForUser(username);
+      final index = list.indexWhere((s) => s.id == student.id);
+      if (index != -1) {
+        list[index] = student;
+        final jsonList = list.map((s) => s.toJson()).toList();
+        await prefs.setString(key, json.encode(jsonList));
+        return true;
+      }
+    } catch (_) {}
+
     return false;
   }
 
+  // Delete student from Cloud Server & local cache
   static Future<bool> deleteStudentForUser(String username, int id) async {
-    final list = await getStudentsForUser(username);
-    list.removeWhere((s) => s.id == id);
-    return await saveStudentsForUser(username, list);
+    final prefs = await SharedPreferences.getInstance();
+    final key = _storageKey(username);
+
+    try {
+      final baseUrl = await getBaseUrl();
+      await http.delete(
+        Uri.parse('$baseUrl/students/$id'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 8));
+    } catch (_) {}
+
+    try {
+      final list = await getStudentsForUser(username);
+      list.removeWhere((s) => s.id == id);
+      final jsonList = list.map((s) => s.toJson()).toList();
+      await prefs.setString(key, json.encode(jsonList));
+      return true;
+    } catch (_) {}
+
+    return false;
   }
 
   static Future<List<Student>> getStudents() async {
@@ -180,6 +235,17 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> sendExpiryNotifications() async {
+    try {
+      final baseUrl = await getBaseUrl();
+      final response = await http.post(
+        Uri.parse('$baseUrl/send_expiry_notifications'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+    } catch (_) {}
+
     final students = await getStudents();
     final expired = students.where((s) => s.isExpired).length;
     return {
