@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
+import 'screens/home_screen.dart';
 import 'services/whatsapp_service.dart';
 
 void main() async {
@@ -20,7 +21,11 @@ class LibraryApp extends StatelessWidget {
         colorSchemeSeed: Colors.deepPurple,
         fontFamily: 'Roboto',
       ),
-      home: const LoginScreen(),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const LoginScreen(),
+        '/home': (context) => const HomeScreen(),
+      },
       debugShowCheckedModeBanner: false,
     );
   }

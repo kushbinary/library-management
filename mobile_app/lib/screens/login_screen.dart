@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,30 +11,38 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  bool _isLogin = true; // true = Login, false = Sign Up
+  bool _isLogin = true;
+
+  // Master Security Passcode required to register any new admin/staff
+  static const String masterSecurityCode = "LIB@2026";
 
   // Login Controllers
-  final _loginUserCtrl = TextEditingController(text: 'admin');
-  final _loginPassCtrl = TextEditingController(text: 'admin123');
+  final _loginUserCtrl = TextEditingController(text: 'kushbinary');
+  final _loginPassCtrl = TextEditingController();
 
   // Sign Up Controllers
   final _signupNameCtrl = TextEditingController();
   final _signupEmailCtrl = TextEditingController();
-  final _signupPhoneCtrl = TextEditingController();
+  final _signupSecurityKeyCtrl = TextEditingController();
   final _signupPassCtrl = TextEditingController();
   final _signupConfirmPassCtrl = TextEditingController();
 
   bool _obscureLoginPass = true;
   bool _obscureSignupPass = true;
   bool _obscureSignupConfirmPass = true;
+  bool _obscureSecurityKey = true;
   String? _errorMessage;
   bool _isLoading = false;
 
-  // Registered accounts stored in memory & SharedPreferences
+  // Brute Force Protection
+  int _failedAttempts = 0;
+  int _lockoutSeconds = 0;
+  Timer? _lockoutTimer;
+
+  // Stored authorized accounts
   final Map<String, String> _registeredAccounts = {
-    'admin': 'admin123',
-    'admin@library.com': 'admin123',
     'kushbinary': 'Admin@1994',
+    'kushbinary@gmail.com': 'Admin@1994',
   };
 
   @override
@@ -43,10 +51,16 @@ class _LoginScreenState extends State<LoginScreen> {
     _loadCustomAccounts();
   }
 
+  @override
+  void dispose() {
+    _lockoutTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadCustomAccounts() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final savedData = prefs.getString('library_registered_users');
+      final savedData = prefs.getString('library_secure_users');
       if (savedData != null) {
         final Map<String, dynamic> decoded = json.decode(savedData);
         decoded.forEach((key, value) {
@@ -61,13 +75,42 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
-        'library_registered_users',
+        'library_secure_users',
         json.encode(_registeredAccounts),
       );
     } catch (_) {}
   }
 
+  void _startLockoutTimer() {
+    setState(() {
+      _lockoutSeconds = 60;
+      _errorMessage =
+          'Security Alert: 5 galat attempts! System 60 seconds ke liye lock ho gaya hai.';
+    });
+
+    _lockoutTimer?.cancel();
+    _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      if (_lockoutSeconds > 1) {
+        setState(() {
+          _lockoutSeconds--;
+          _errorMessage =
+              'Security Lockout: Kripya $_lockoutSeconds seconds wait karein.';
+        });
+      } else {
+        timer.cancel();
+        setState(() {
+          _lockoutSeconds = 0;
+          _failedAttempts = 0;
+          _errorMessage = null;
+        });
+      }
+    });
+  }
+
   void _handleLogin() async {
+    if (_lockoutSeconds > 0) return;
+
     final username = _loginUserCtrl.text.trim().toLowerCase();
     final password = _loginPassCtrl.text.trim();
 
@@ -81,35 +124,39 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
 
-    await Future.delayed(const Duration(milliseconds: 300));
+    await Future.delayed(const Duration(milliseconds: 350));
 
     if (_registeredAccounts.containsKey(username) &&
         _registeredAccounts[username] == password) {
+      _failedAttempts = 0;
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.check_circle, color: Colors.white),
+                const Icon(Icons.verified_user_rounded, color: Colors.white),
                 const SizedBox(width: 10),
-                Text('Welcome ${_loginUserCtrl.text.trim()}! Login Successful 🎉'),
+                Text('Secure Login Verified! Welcome $username 🎉'),
               ],
             ),
             backgroundColor: Colors.green.shade700,
             duration: const Duration(seconds: 2),
           ),
         );
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
+        Navigator.pushReplacementNamed(context, '/home');
       }
     } else {
       if (mounted) {
+        _failedAttempts++;
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Galat Username ya Password! Kripya check karein.';
+          if (_failedAttempts >= 5) {
+            _startLockoutTimer();
+          } else {
+            _errorMessage =
+                'Access Denied: Galat Username ya Password! (${5 - _failedAttempts} attempts left)';
+          }
         });
       }
     }
@@ -118,32 +165,39 @@ class _LoginScreenState extends State<LoginScreen> {
   void _handleSignUp() async {
     final name = _signupNameCtrl.text.trim();
     final email = _signupEmailCtrl.text.trim().toLowerCase();
-    final phone = _signupPhoneCtrl.text.trim();
+    final secretKey = _signupSecurityKeyCtrl.text.trim();
     final password = _signupPassCtrl.text.trim();
     final confirmPass = _signupConfirmPassCtrl.text.trim();
 
-    if (name.isEmpty || email.isEmpty || password.isEmpty) {
-      setState(() => _errorMessage = 'Kripya sabhi zaroori fields bharein.');
+    if (name.isEmpty || email.isEmpty || password.isEmpty || secretKey.isEmpty) {
+      setState(() => _errorMessage = 'Kripya sabhi fields bharein.');
       return;
     }
 
-    if (!email.contains('@') && email.length < 3) {
-      setState(() => _errorMessage = 'Sahi Email address enter karein.');
+    // Validate Master Security Key
+    if (secretKey != masterSecurityCode && secretKey != "Admin@1994") {
+      setState(() {
+        _errorMessage =
+            'Unauthorized: Galat Master Security Key! Sirf authorized admin hi new staff register kar sakte hain.';
+      });
       return;
     }
 
-    if (password.length < 4) {
-      setState(() => _errorMessage = 'Password kam se kam 4 characters ka hona chahiye.');
+    if (password.length < 6) {
+      setState(() =>
+          _errorMessage = 'Password kam se kam 6 characters ka hona chahiye.');
       return;
     }
 
     if (password != confirmPass) {
-      setState(() => _errorMessage = 'Password aur Confirm Password match nahi kar rahe!');
+      setState(() =>
+          _errorMessage = 'Password aur Confirm Password match nahi kar rahe!');
       return;
     }
 
     if (_registeredAccounts.containsKey(email)) {
-      setState(() => _errorMessage = 'Yeh Email pehle se registered hai! Login karein.');
+      setState(
+          () => _errorMessage = 'Yeh Account pehle se registered hai! Login karein.');
       return;
     }
 
@@ -154,9 +208,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     await Future.delayed(const Duration(milliseconds: 400));
     await _saveCustomAccount(email, password);
-    if (phone.isNotEmpty) {
-      await _saveCustomAccount(phone, password);
-    }
 
     if (mounted) {
       setState(() {
@@ -164,11 +215,15 @@ class _LoginScreenState extends State<LoginScreen> {
         _isLogin = true;
         _loginUserCtrl.text = email;
         _loginPassCtrl.text = password;
+        _signupSecurityKeyCtrl.clear();
+        _signupPassCtrl.clear();
+        _signupConfirmPassCtrl.clear();
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Account "$name" successfully ban gaya! Ab login karein 🎉'),
+          content: Text(
+              'Authorized Account "$name" Created! Ab login kar sakte hain 🎉'),
           backgroundColor: Colors.green.shade700,
           duration: const Duration(seconds: 3),
         ),
@@ -187,9 +242,9 @@ class _LoginScreenState extends State<LoginScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
+              const Color(0xFF1E1035),
               Colors.deepPurple.shade900,
-              Colors.deepPurple.shade700,
-              Colors.indigo.shade800,
+              const Color(0xFF0F172A),
             ],
           ),
         ),
@@ -198,7 +253,8 @@ class _LoginScreenState extends State<LoginScreen> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
               child: Card(
-                elevation: 16,
+                elevation: 20,
+                color: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(24),
                 ),
@@ -207,6 +263,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Lock & Shield Icon
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
@@ -214,28 +271,34 @@ class _LoginScreenState extends State<LoginScreen> {
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          Icons.local_library_rounded,
-                          size: 42,
+                          Icons.shield_rounded,
+                          size: 44,
                           color: Colors.deepPurple.shade700,
                         ),
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Library Hub',
+                        'Secure Library Hub',
                         style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: Colors.deepPurple.shade900,
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        _isLogin
-                            ? 'Admin & Staff Login'
-                            : 'Create New Admin / Staff Account',
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 13,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.lock_outline, size: 13, color: Colors.grey.shade600),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Authorized Personnel Access Only',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 20),
 
@@ -250,10 +313,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           children: [
                             Expanded(
                               child: GestureDetector(
-                                onTap: () => setState(() {
-                                  _isLogin = true;
-                                  _errorMessage = null;
-                                }),
+                                onTap: _lockoutSeconds > 0
+                                    ? null
+                                    : () => setState(() {
+                                          _isLogin = true;
+                                          _errorMessage = null;
+                                        }),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(vertical: 10),
                                   decoration: BoxDecoration(
@@ -271,9 +336,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                   child: Center(
                                     child: Text(
-                                      'Login',
+                                      'Secure Login',
                                       style: TextStyle(
-                                        fontWeight: _isLogin ? FontWeight.bold : FontWeight.normal,
+                                        fontWeight:
+                                            _isLogin ? FontWeight.bold : FontWeight.normal,
                                         color: _isLogin
                                             ? Colors.deepPurple.shade800
                                             : Colors.grey.shade700,
@@ -285,10 +351,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             Expanded(
                               child: GestureDetector(
-                                onTap: () => setState(() {
-                                  _isLogin = false;
-                                  _errorMessage = null;
-                                }),
+                                onTap: _lockoutSeconds > 0
+                                    ? null
+                                    : () => setState(() {
+                                          _isLogin = false;
+                                          _errorMessage = null;
+                                        }),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(vertical: 10),
                                   decoration: BoxDecoration(
@@ -306,9 +374,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                   child: Center(
                                     child: Text(
-                                      'Sign Up',
+                                      'Register Staff',
                                       style: TextStyle(
-                                        fontWeight: !_isLogin ? FontWeight.bold : FontWeight.normal,
+                                        fontWeight:
+                                            !_isLogin ? FontWeight.bold : FontWeight.normal,
                                         color: !_isLogin
                                             ? Colors.deepPurple.shade800
                                             : Colors.grey.shade700,
@@ -323,38 +392,59 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Error Message Box
+                      // Error / Warning Message Box
                       if (_errorMessage != null)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          margin: const EdgeInsets.only(bottom: 14),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          margin: const EdgeInsets.only(bottom: 16),
                           decoration: BoxDecoration(
-                            color: Colors.red.shade50,
+                            color: _lockoutSeconds > 0
+                                ? Colors.orange.shade50
+                                : Colors.red.shade50,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.red.shade200),
+                            border: Border.all(
+                              color: _lockoutSeconds > 0
+                                  ? Colors.orange.shade300
+                                  : Colors.red.shade300,
+                            ),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.error_outline, color: Colors.red.shade700, size: 18),
+                              Icon(
+                                _lockoutSeconds > 0
+                                    ? Icons.timer_outlined
+                                    : Icons.gpp_bad_outlined,
+                                color: _lockoutSeconds > 0
+                                    ? Colors.orange.shade900
+                                    : Colors.red.shade700,
+                                size: 20,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   _errorMessage!,
-                                  style: TextStyle(color: Colors.red.shade800, fontSize: 12),
+                                  style: TextStyle(
+                                    color: _lockoutSeconds > 0
+                                        ? Colors.orange.shade900
+                                        : Colors.red.shade900,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                         ),
 
-                      // FORM FIELDS
+                      // FORMS
                       if (_isLogin) ...[
-                        // LOGIN FORM
+                        // SECURE LOGIN FORM
                         TextField(
                           controller: _loginUserCtrl,
+                          enabled: _lockoutSeconds == 0,
                           decoration: InputDecoration(
-                            labelText: 'Admin Username / Email',
-                            prefixIcon: const Icon(Icons.person_outline),
+                            labelText: 'Username or Email',
+                            prefixIcon: const Icon(Icons.account_circle_outlined),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
@@ -364,10 +454,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextField(
                           controller: _loginPassCtrl,
                           obscureText: _obscureLoginPass,
+                          enabled: _lockoutSeconds == 0,
                           onSubmitted: (_) => _handleLogin(),
                           decoration: InputDecoration(
                             labelText: 'Password',
-                            prefixIcon: const Icon(Icons.lock_outline_rounded),
+                            prefixIcon: const Icon(Icons.password_rounded),
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _obscureLoginPass
@@ -388,9 +479,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 20),
                         SizedBox(
                           width: double.infinity,
-                          height: 48,
+                          height: 50,
                           child: ElevatedButton(
-                            onPressed: _isLoading ? null : _handleLogin,
+                            onPressed:
+                                (_isLoading || _lockoutSeconds > 0) ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.deepPurple.shade700,
                               foregroundColor: Colors.white,
@@ -408,14 +500,16 @@ class _LoginScreenState extends State<LoginScreen> {
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : const Row(
+                                : Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.login_rounded, size: 18),
-                                      SizedBox(width: 8),
+                                      const Icon(Icons.lock_open_rounded, size: 20),
+                                      const SizedBox(width: 8),
                                       Text(
-                                        'Login',
-                                        style: TextStyle(
+                                        _lockoutSeconds > 0
+                                            ? 'Locked ($_lockoutSeconds s)'
+                                            : 'Authenticate & Enter',
+                                        style: const TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
                                         ),
@@ -424,36 +518,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              "Account nahi hai? ",
-                              style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
-                            ),
-                            GestureDetector(
-                              onTap: () => setState(() {
-                                _isLogin = false;
-                                _errorMessage = null;
-                              }),
-                              child: Text(
-                                'Sign Up karein',
-                                style: TextStyle(
-                                  color: Colors.deepPurple.shade700,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
                       ] else ...[
-                        // SIGN UP FORM
+                        // RESTRICTED SIGN UP FORM (REQUIRES MASTER SECURITY KEY)
                         TextField(
                           controller: _signupNameCtrl,
                           decoration: InputDecoration(
-                            labelText: 'Full Name',
+                            labelText: 'Staff / Admin Full Name',
                             prefixIcon: const Icon(Icons.badge_outlined),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
@@ -465,20 +535,34 @@ class _LoginScreenState extends State<LoginScreen> {
                           controller: _signupEmailCtrl,
                           keyboardType: TextInputType.emailAddress,
                           decoration: InputDecoration(
-                            labelText: 'Email Address / Username',
-                            prefixIcon: const Icon(Icons.email_outlined),
+                            labelText: 'Username or Email',
+                            prefixIcon: const Icon(Icons.alternate_email),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
                           ),
                         ),
                         const SizedBox(height: 12),
+                        // Master Passcode Field
                         TextField(
-                          controller: _signupPhoneCtrl,
-                          keyboardType: TextInputType.phone,
+                          controller: _signupSecurityKeyCtrl,
+                          obscureText: _obscureSecurityKey,
                           decoration: InputDecoration(
-                            labelText: 'Mobile Number (Optional)',
-                            prefixIcon: const Icon(Icons.phone_outlined),
+                            labelText: 'Master Security Key (Secret PIN)',
+                            hintText: 'Required to authorize new staff',
+                            prefixIcon: const Icon(Icons.vpn_key_outlined),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureSecurityKey
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscureSecurityKey = !_obscureSecurityKey;
+                                });
+                              },
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
@@ -489,7 +573,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           controller: _signupPassCtrl,
                           obscureText: _obscureSignupPass,
                           decoration: InputDecoration(
-                            labelText: 'Create Password',
+                            labelText: 'Create Password (min 6 chars)',
                             prefixIcon: const Icon(Icons.lock_outline_rounded),
                             suffixIcon: IconButton(
                               icon: Icon(
@@ -523,7 +607,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               onPressed: () {
                                 setState(() {
-                                  _obscureSignupConfirmPass = !_obscureSignupConfirmPass;
+                                  _obscureSignupConfirmPass =
+                                      !_obscureSignupConfirmPass;
                                 });
                               },
                             ),
@@ -535,7 +620,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 20),
                         SizedBox(
                           width: double.infinity,
-                          height: 48,
+                          height: 50,
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _handleSignUp,
                             style: ElevatedButton.styleFrom(
@@ -558,42 +643,18 @@ class _LoginScreenState extends State<LoginScreen> {
                                 : const Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.person_add_rounded, size: 18),
+                                      Icon(Icons.how_to_reg_rounded, size: 20),
                                       SizedBox(width: 8),
                                       Text(
-                                        'Create Account',
+                                        'Authorize & Create Account',
                                         style: TextStyle(
-                                          fontSize: 16,
+                                          fontSize: 15,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                     ],
                                   ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              "Already account hai? ",
-                              style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
-                            ),
-                            GestureDetector(
-                              onTap: () => setState(() {
-                                _isLogin = true;
-                                _errorMessage = null;
-                              }),
-                              child: Text(
-                                'Login karein',
-                                style: TextStyle(
-                                  color: Colors.deepPurple.shade700,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ],
                         ),
                       ],
                     ],

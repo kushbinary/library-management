@@ -87,6 +87,13 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.refresh),
             onPressed: _loadStudents,
           ),
+          IconButton(
+            tooltip: 'Logout',
+            icon: const Icon(Icons.logout_rounded),
+            onPressed: () {
+              Navigator.pushReplacementNamed(context, '/');
+            },
+          ),
         ],
       ),
       body: Column(
