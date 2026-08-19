@@ -2,9 +2,9 @@
 Library Management Application - Backend API & Cloud Portal
 
 Features:
-- Cloud-ready Database (Neon PostgreSQL & SQLite auto-fallback)
-- User Authentication (Admin Login, Password hashing & session protection)
-- Student registration & seat management with admission details & fee tracking
+- Multi-tenant Cloud Database (Neon PostgreSQL & SQLite auto-fallback)
+- User Authentication (Registration / Sign Up, Login, Multi-user Data Isolation)
+- Per-user Student registration & seat management with admission details & fee tracking
 - WhatsApp integration via Twilio
 - Expiry notification tracking & cron endpoints
 - REST API for Mobile App synchronization
@@ -54,7 +54,12 @@ class AdminUser(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
+    library_name = db.Column(db.String(120), nullable=True, default='My Library')
+    email = db.Column(db.String(120), nullable=True, default='')
+    phone = db.Column(db.String(20), nullable=True, default='')
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+    students = db.relationship('Student', backref='owner', lazy=True, cascade='all, delete-orphan')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -62,11 +67,22 @@ class AdminUser(db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'username': self.username,
+            'library_name': self.library_name or 'My Library',
+            'email': self.email or '',
+            'phone': self.phone or '',
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None
+        }
+
 
 class Student(db.Model):
     __tablename__ = 'students'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('admin_users.id'), nullable=True)
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), nullable=True, default='')
     phone = db.Column(db.String(20), nullable=False)
@@ -84,6 +100,7 @@ class Student(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
+            'user_id': self.user_id,
             'name': self.name,
             'email': self.email or '',
             'phone': self.phone,
@@ -102,7 +119,7 @@ class Student(db.Model):
         }
 
     def get_seat_status(self):
-        filled_seats = Student.query.count()
+        filled_seats = Student.query.filter_by(user_id=self.user_id).count() if self.user_id else Student.query.count()
         total = LIBRARY_CONFIG['total_seats']
         return {'filled': filled_seats, 'total': total, 'available': max(0, total - filled_seats)}
 
@@ -118,7 +135,7 @@ class Student(db.Model):
         return False
 
 
-# ==================== Database Auto-Initialization ====================
+# ==================== Database Auto-Initialization & Migration ====================
 
 def init_db():
     try:
@@ -126,11 +143,15 @@ def init_db():
         # Ensure new columns exist in case of pre-existing tables
         with db.engine.connect() as conn:
             migration_statements = [
+                "ALTER TABLE students ADD COLUMN IF NOT EXISTS user_id INTEGER;",
                 "ALTER TABLE students ADD COLUMN IF NOT EXISTS total_fee FLOAT DEFAULT 1000.0;",
                 "ALTER TABLE students ADD COLUMN IF NOT EXISTS paid_amount FLOAT DEFAULT 1000.0;",
                 "ALTER TABLE students ADD COLUMN IF NOT EXISTS due_amount FLOAT DEFAULT 0.0;",
                 "ALTER TABLE students ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(50) DEFAULT 'UPI';",
-                "ALTER TABLE students ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50) DEFAULT 'Paid';"
+                "ALTER TABLE students ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50) DEFAULT 'Paid';",
+                "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS library_name VARCHAR(120) DEFAULT 'My Library';",
+                "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS email VARCHAR(120) DEFAULT '';",
+                "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS phone VARCHAR(20) DEFAULT '';"
             ]
             for stmt in migration_statements:
                 try:
@@ -144,11 +165,18 @@ def init_db():
         default_admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
         existing_admin = AdminUser.query.filter_by(username=default_admin_username).first()
         if not existing_admin:
-            new_admin = AdminUser(username=default_admin_username)
+            new_admin = AdminUser(username=default_admin_username, library_name='Central Library')
             new_admin.set_password(default_admin_password)
             db.session.add(new_admin)
             db.session.commit()
             print(f"[AUTH] Default admin created -> Username: {default_admin_username}")
+
+        # Link any orphaned students to first admin user
+        default_user = AdminUser.query.first()
+        if default_user:
+            Student.query.filter(Student.user_id.is_(None)).update({'user_id': default_user.id})
+            db.session.commit()
+
     except Exception as e:
         db.session.rollback()
         print(f"[DB INIT ERROR] {e}")
@@ -172,12 +200,57 @@ def manual_init_db():
         }), 500
 
 
+# ==================== User Scoping & Authentication Helper ====================
+
+def get_request_user():
+    """Extract authenticated user from Session or API Headers/Payload."""
+    # 1. From Session (Web)
+    if 'user_id' in session:
+        return AdminUser.query.get(session['user_id'])
+
+    # 2. From Headers (Mobile App API)
+    user_id_header = request.headers.get('X-User-Id')
+    username_header = request.headers.get('X-Username')
+
+    if user_id_header:
+        try:
+            user = AdminUser.query.get(int(user_id_header))
+            if user: return user
+        except:
+            pass
+
+    if username_header:
+        user = AdminUser.query.filter_by(username=username_header.strip()).first()
+        if user: return user
+
+    # 3. From Request args or json
+    username_param = request.args.get('username')
+    if not username_param and request.is_json and request.json:
+        username_param = request.json.get('username')
+    if username_param:
+        user = AdminUser.query.filter_by(username=str(username_param).strip()).first()
+        if user: return user
+
+    user_id_param = request.args.get('user_id')
+    if not user_id_param and request.is_json and request.json:
+        user_id_param = request.json.get('user_id')
+    if user_id_param:
+        try:
+            user = AdminUser.query.get(int(user_id_param))
+            if user: return user
+        except:
+            pass
+
+    # Fallback to first user
+    return AdminUser.query.first()
+
+
 # ==================== Authentication Decorator ====================
 
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'admin_user' not in session:
+        if 'admin_user' not in session or 'user_id' not in session:
             flash('Please log in with your username and password to access this page.', 'warning')
             return redirect(url_for('login', next=request.url))
         return f(*args, **kwargs)
@@ -209,7 +282,46 @@ def send_whatsapp_message(student_name, student_phone, message_type='registratio
     return f"Message processed for {student_phone}"
 
 
-# ==================== Authentication Routes ====================
+# ==================== Authentication Routes (Web) ====================
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        confirm_password = request.form.get('confirm_password', '').strip()
+        library_name = request.form.get('library_name', '').strip() or 'My Library'
+        phone = request.form.get('phone', '').strip()
+
+        if not username or not password:
+            flash('Username and password are required.', 'danger')
+            return render_template('signup.html')
+
+        if password != confirm_password:
+            flash('Passwords do not match.', 'danger')
+            return render_template('signup.html')
+
+        if len(password) < 4:
+            flash('Password must be at least 4 characters long.', 'danger')
+            return render_template('signup.html')
+
+        if AdminUser.query.filter_by(username=username).first():
+            flash('Username already exists. Please choose another or Login.', 'warning')
+            return render_template('signup.html')
+
+        user = AdminUser(username=username, library_name=library_name, phone=phone)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+
+        session['admin_user'] = user.username
+        session['user_id'] = user.id
+        session['library_name'] = user.library_name
+        flash(f'Account created successfully! Welcome, {user.username}!', 'success')
+        return redirect(url_for('student_list'))
+
+    return render_template('signup.html')
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -221,6 +333,7 @@ def login():
         if user and user.check_password(password):
             session['admin_user'] = user.username
             session['user_id'] = user.id
+            session['library_name'] = user.library_name or 'My Library'
             flash(f'Welcome back, {user.username}!', 'success')
             next_page = request.form.get('next') or url_for('student_list')
             return redirect(next_page)
@@ -234,6 +347,7 @@ def login():
 def logout():
     session.pop('admin_user', None)
     session.pop('user_id', None)
+    session.pop('library_name', None)
     flash('You have been logged out successfully.', 'info')
     return redirect(url_for('login'))
 
@@ -246,7 +360,7 @@ def change_password():
         new_password = request.form.get('new_password', '').strip()
         confirm_password = request.form.get('confirm_password', '').strip()
 
-        user = AdminUser.query.filter_by(username=session['admin_user']).first()
+        user = AdminUser.query.get(session['user_id'])
         if not user or not user.check_password(current_password):
             flash('Current password is incorrect.', 'danger')
             return render_template('change_password.html')
@@ -267,7 +381,7 @@ def change_password():
     return render_template('change_password.html')
 
 
-# ==================== Frontend Routes ====================
+# ==================== Frontend Routes (Isolated per User) ====================
 
 @app.route('/')
 def index():
@@ -277,7 +391,8 @@ def index():
 @app.route('/students')
 @login_required
 def student_list():
-    students = Student.query.order_by(Student.created_at.desc()).all()
+    user_id = session.get('user_id')
+    students = Student.query.filter_by(user_id=user_id).order_by(Student.created_at.desc()).all()
     return render_template('students.html', students=students)
 
 
@@ -285,6 +400,7 @@ def student_list():
 @login_required
 def add_student():
     if request.method == 'POST':
+        user_id = session.get('user_id')
         name = request.form.get('name')
         email = request.form.get('email', '')
         phone = request.form.get('phone')
@@ -306,6 +422,7 @@ def add_student():
             return render_template('add_student.html')
 
         student = Student(
+            user_id=user_id,
             name=name,
             email=email,
             phone=phone,
@@ -334,14 +451,16 @@ def add_student():
 @app.route('/student/<int:student_id>')
 @login_required
 def view_student(student_id):
-    student = db.get_or_404(Student, student_id)
+    user_id = session.get('user_id')
+    student = Student.query.filter_by(id=student_id, user_id=user_id).first_or_404()
     return render_template('student_profile.html', student=student)
 
 
 @app.route('/student/<int:student_id>/send_reminder')
 @login_required
 def send_reminder(student_id):
-    student = db.get_or_404(Student, student_id)
+    user_id = session.get('user_id')
+    student = Student.query.filter_by(id=student_id, user_id=user_id).first_or_404()
     if student.is_expired():
         send_whatsapp_message(student.name, student.phone, 'expiry_warning')
         flash(f'Expiry reminder sent to {student.name}!', 'success')
@@ -377,7 +496,39 @@ def download_mylibbook_apk():
     return "APK not found on server", 404
 
 
-# ==================== REST API Routes ====================
+# ==================== REST API Routes (Multi-Tenant) ====================
+
+@app.route('/api/signup', methods=['POST'])
+def api_signup():
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    library_name = data.get('library_name', '').strip() or data.get('fullName', '').strip() or 'My Library'
+    email = data.get('email', '').strip()
+    phone = data.get('phone', '').strip()
+
+    if not username or not password:
+        return jsonify({'success': False, 'error': 'Username and password are required'}), 400
+
+    if len(password) < 4:
+        return jsonify({'success': False, 'error': 'Password must be at least 4 characters long'}), 400
+
+    if AdminUser.query.filter_by(username=username).first():
+        return jsonify({'success': False, 'error': 'Username is already taken. Please choose another or login.'}), 409
+
+    user = AdminUser(username=username, library_name=library_name, email=email, phone=phone)
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': 'Account created successfully!',
+        'user': user.to_dict(),
+        'username': user.username,
+        'user_id': user.id
+    }), 201
+
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -390,19 +541,26 @@ def api_login():
         return jsonify({
             'success': True,
             'message': 'Login successful',
-            'username': user.username
+            'user': user.to_dict(),
+            'username': user.username,
+            'user_id': user.id
         }), 200
     return jsonify({'success': False, 'error': 'Invalid username or password'}), 401
 
 
 @app.route('/api/students', methods=['GET'])
 def api_get_students():
-    students = Student.query.order_by(Student.created_at.desc()).all()
+    user = get_request_user()
+    if not user:
+        return jsonify([])
+
+    students = Student.query.filter_by(user_id=user.id).order_by(Student.created_at.desc()).all()
     return jsonify([s.to_dict() for s in students])
 
 
 @app.route('/api/students', methods=['POST'])
 def api_add_student():
+    user = get_request_user()
     data = request.json or {}
     required_fields = ['name', 'phone', 'admission_date', 'timing', 'seat_number', 'expiry_date']
     missing = [f for f in required_fields if not data.get(f)]
@@ -423,6 +581,7 @@ def api_add_student():
     payment_status = data.get('payment_status') or data.get('paymentStatus') or ('Paid' if due_amount <= 0 else ('Due' if paid_amount <= 0 else 'Partial'))
 
     student = Student(
+        user_id=user.id if user else None,
         name=data['name'],
         email=data.get('email', ''),
         phone=data['phone'],
@@ -445,9 +604,13 @@ def api_add_student():
 
 @app.route('/api/students/<int:student_id>', methods=['PUT'])
 def api_update_student(student_id):
-    student = db.get_or_404(Student, student_id)
-    data = request.json or {}
+    user = get_request_user()
+    query = Student.query.filter_by(id=student_id)
+    if user:
+        query = query.filter_by(user_id=user.id)
+    student = query.first_or_404()
 
+    data = request.json or {}
     if 'name' in data: student.name = data['name']
     if 'phone' in data: student.phone = data['phone']
     if 'timing' in data: student.timing = data['timing']
@@ -470,7 +633,12 @@ def api_update_student(student_id):
 
 @app.route('/api/students/<int:student_id>', methods=['DELETE'])
 def api_delete_student(student_id):
-    student = db.get_or_404(Student, student_id)
+    user = get_request_user()
+    query = Student.query.filter_by(id=student_id)
+    if user:
+        query = query.filter_by(user_id=user.id)
+    student = query.first_or_404()
+
     db.session.delete(student)
     db.session.commit()
     return jsonify({'message': 'Student deleted successfully'})
@@ -478,15 +646,23 @@ def api_delete_student(student_id):
 
 @app.route('/api/expired_students', methods=['GET'])
 def api_get_expired_students():
+    user = get_request_user()
     today = datetime.date.today()
-    expired = Student.query.filter(Student.expiry_date <= today).all()
+    query = Student.query.filter(Student.expiry_date <= today)
+    if user:
+        query = query.filter_by(user_id=user.id)
+    expired = query.all()
     return jsonify([s.to_dict() for s in expired])
 
 
 @app.route('/api/send_expiry_notifications', methods=['POST'])
 def api_send_expiry_notifications():
+    user = get_request_user()
     today = datetime.date.today()
-    expired = Student.query.filter(Student.expiry_date <= today).all()
+    query = Student.query.filter(Student.expiry_date <= today)
+    if user:
+        query = query.filter_by(user_id=user.id)
+    expired = query.all()
     for student in expired:
         send_whatsapp_message(student.name, student.phone, 'expiry_warning')
     return jsonify({'message': f'Sent notifications to {len(expired)} expired memberships.'})

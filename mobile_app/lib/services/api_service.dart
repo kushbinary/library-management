@@ -32,8 +32,46 @@ class ApiService {
     return 'library_students_user_${username.toLowerCase().trim()}';
   }
 
+  // Register / Sign Up new Library Account on Cloud Server
+  static Future<Map<String, dynamic>> signupToServer({
+    required String username,
+    required String password,
+    String? libraryName,
+    String? phone,
+  }) async {
+    try {
+      final baseUrl = await getBaseUrl();
+      final response = await http.post(
+        Uri.parse('$baseUrl/signup'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'username': username.trim(),
+          'password': password,
+          'library_name': libraryName?.trim().isNotEmpty == true ? libraryName!.trim() : 'My Library',
+          'phone': phone?.trim() ?? '',
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      final data = json.decode(response.body);
+      if (response.statusCode == 201 || (data is Map && data['success'] == true)) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('current_logged_in_user', username.trim());
+        if (data['user_id'] != null) {
+          await prefs.setInt('current_user_id', data['user_id']);
+        }
+        if (libraryName != null && libraryName.isNotEmpty) {
+          await prefs.setString('library_custom_business_name', libraryName.trim());
+        }
+        return {'success': true, 'message': data['message'] ?? 'Registration successful!'};
+      }
+      return {'success': false, 'error': data['error'] ?? 'Sign Up failed. Please try again.'};
+    } catch (e) {
+      return {'success': false, 'error': 'Server connection failed: $e'};
+    }
+  }
+
   // Login with Cloud Server
-  static Future<bool> loginToServer(String username, String password) async {
+  static Future<Map<String, dynamic>> loginToServer(String username, String password) async {
     try {
       final baseUrl = await getBaseUrl();
       final response = await http.post(
@@ -45,17 +83,25 @@ class ApiService {
         }),
       ).timeout(const Duration(seconds: 8));
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data['success'] == true;
+      final data = json.decode(response.body);
+      if (response.statusCode == 200 && data['success'] == true) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('current_logged_in_user', username.trim());
+        if (data['user_id'] != null) {
+          await prefs.setInt('current_user_id', data['user_id']);
+        }
+        if (data['user'] != null && data['user']['library_name'] != null) {
+          await prefs.setString('library_custom_business_name', data['user']['library_name']);
+        }
+        return {'success': true, 'message': 'Login successful!'};
       }
+      return {'success': false, 'error': data['error'] ?? 'Invalid username or password'};
     } catch (e) {
-      // Offline fallback: check locally registered accounts
+      return {'success': false, 'error': 'Server connection failed: $e'};
     }
-    return false;
   }
 
-  // Get students list from Cloud Server (with offline cache fallback)
+  // Get students list from Cloud Server for specific user (with offline cache fallback)
   static Future<List<Student>> getStudentsForUser(String username) async {
     final prefs = await SharedPreferences.getInstance();
     final key = _storageKey(username);
@@ -63,15 +109,18 @@ class ApiService {
     try {
       final baseUrl = await getBaseUrl();
       final response = await http.get(
-        Uri.parse('$baseUrl/students'),
-        headers: {'Accept': 'application/json'},
+        Uri.parse('$baseUrl/students?username=${Uri.encodeComponent(username)}'),
+        headers: {
+          'Accept': 'application/json',
+          'X-Username': username,
+        },
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final List<dynamic> list = json.decode(response.body);
         final students = list.map((item) => Student.fromJson(item)).toList();
 
-        // Update local cache
+        // Update local cache for this specific user
         final jsonList = students.map((s) => s.toJson()).toList();
         await prefs.setString(key, json.encode(jsonList));
 
@@ -118,7 +167,7 @@ class ApiService {
     return [];
   }
 
-  // Add new student to Cloud Server and local cache
+  // Add new student to Cloud Server and local cache for specific user
   static Future<bool> addStudentForUser(String username, Student student) async {
     final prefs = await SharedPreferences.getInstance();
     final key = _storageKey(username);
@@ -128,10 +177,16 @@ class ApiService {
 
     try {
       final baseUrl = await getBaseUrl();
+      final payload = student.toJson();
+      payload['username'] = username;
+
       final response = await http.post(
         Uri.parse('$baseUrl/students'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(student.toJson()),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Username': username,
+        },
+        body: json.encode(payload),
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 201 || response.statusCode == 200) {
@@ -182,10 +237,16 @@ class ApiService {
     if (student.id != null) {
       try {
         final baseUrl = await getBaseUrl();
+        final payload = student.toJson();
+        payload['username'] = username;
+
         await http.put(
           Uri.parse('$baseUrl/students/${student.id}'),
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode(student.toJson()),
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Username': username,
+          },
+          body: json.encode(payload),
         ).timeout(const Duration(seconds: 8));
       } catch (_) {}
     }
@@ -212,8 +273,11 @@ class ApiService {
     try {
       final baseUrl = await getBaseUrl();
       await http.delete(
-        Uri.parse('$baseUrl/students/$id'),
-        headers: {'Accept': 'application/json'},
+        Uri.parse('$baseUrl/students/$id?username=${Uri.encodeComponent(username)}'),
+        headers: {
+          'Accept': 'application/json',
+          'X-Username': username,
+        },
       ).timeout(const Duration(seconds: 8));
     } catch (_) {}
 
@@ -230,22 +294,27 @@ class ApiService {
 
   static Future<List<Student>> getStudents() async {
     final prefs = await SharedPreferences.getInstance();
-    final user = prefs.getString('current_logged_in_user') ?? 'kushbinary';
+    final user = prefs.getString('current_logged_in_user') ?? 'admin';
     return getStudentsForUser(user);
   }
 
   static Future<bool> addStudent(Student student) async {
     final prefs = await SharedPreferences.getInstance();
-    final user = prefs.getString('current_logged_in_user') ?? 'kushbinary';
+    final user = prefs.getString('current_logged_in_user') ?? 'admin';
     return addStudentForUser(user, student);
   }
 
   static Future<Map<String, dynamic>> sendExpiryNotifications() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final user = prefs.getString('current_logged_in_user') ?? 'admin';
       final baseUrl = await getBaseUrl();
       final response = await http.post(
         Uri.parse('$baseUrl/send_expiry_notifications'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Username': user,
+        },
       ).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
         return json.decode(response.body);
