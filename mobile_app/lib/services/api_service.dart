@@ -50,7 +50,7 @@ class ApiService {
           'library_name': libraryName?.trim().isNotEmpty == true ? libraryName!.trim() : 'My Library',
           'phone': phone?.trim() ?? '',
         }),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 60));
 
       final data = json.decode(response.body);
       if (response.statusCode == 201 || (data is Map && data['success'] == true)) {
@@ -81,7 +81,7 @@ class ApiService {
           'username': username.trim(),
           'password': password,
         }),
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 60));
 
       final data = json.decode(response.body);
       if (response.statusCode == 200 && data['success'] == true) {
@@ -114,7 +114,7 @@ class ApiService {
           'Accept': 'application/json',
           'X-Username': username,
         },
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 200) {
         final List<dynamic> list = json.decode(response.body);
@@ -187,7 +187,7 @@ class ApiService {
           'X-Username': username,
         },
         body: json.encode(payload),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -247,7 +247,7 @@ class ApiService {
             'X-Username': username,
           },
           body: json.encode(payload),
-        ).timeout(const Duration(seconds: 8));
+        ).timeout(const Duration(seconds: 60));
       } catch (_) {}
     }
 
@@ -278,7 +278,7 @@ class ApiService {
           'Accept': 'application/json',
           'X-Username': username,
         },
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 60));
     } catch (_) {}
 
     try {
@@ -315,7 +315,7 @@ class ApiService {
           'Content-Type': 'application/json',
           'X-Username': user,
         },
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 60));
       if (response.statusCode == 200) {
         return json.decode(response.body);
       }

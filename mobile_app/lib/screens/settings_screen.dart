@@ -631,6 +631,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     } catch (_) {}
                   },
                 ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(10)),
+                    child: const Icon(Icons.system_update_rounded, color: Colors.orange),
+                  ),
+                  title: Text(isHi ? 'ऐप अपडेट करें' : 'Check for Updates', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF1E1B4B))),
+                  subtitle: Text(isHi ? 'नया वर्ज़न डाउनलोड करें' : 'Download latest version', style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : Colors.grey)),
+                  trailing: const Icon(Icons.download_rounded),
+                  onTap: () async {
+                    final uri = Uri.parse('https://library-management-1-k8rn.onrender.com/download-apk');
+                    try {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    } catch (_) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to open update link.')));
+                      }
+                    }
+                  },
+                ),
               ],
             ),
           ),
