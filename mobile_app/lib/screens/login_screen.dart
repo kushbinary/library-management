@@ -12,12 +12,28 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+enum AuthMode {
+  enterPin,
+  createPin,
+  confirmPin,
+  passwordLogin,
+  staffSignup,
+}
+
+class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   final LocalAuthentication _localAuth = LocalAuthentication();
-  bool _isLogin = true;
-  bool _isQuickUnlockMode = false;
-  String? _savedUsername;
-  bool _isAuthenticating = false;
+  
+  AuthMode _authMode = AuthMode.passwordLogin;
+  String _enteredPin = '';
+  String _tempCreatedPin = '';
+  String? _savedPin;
+  String _currentUser = 'kushbinary';
+  String? _errorMessage;
+  bool _isLoading = false;
+  bool _obscureLoginPass = true;
+  bool _obscureSignupPass = true;
+  bool _obscureSignupConfirmPass = true;
+  bool _obscureSecurityKey = true;
 
   // Master Security Passcode required to register any new admin/staff
   static const String masterSecurityCode = "LIB@2026";
@@ -33,18 +49,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _signupPassCtrl = TextEditingController();
   final _signupConfirmPassCtrl = TextEditingController();
 
-  bool _obscureLoginPass = true;
-  bool _obscureSignupPass = true;
-  bool _obscureSignupConfirmPass = true;
-  bool _obscureSecurityKey = true;
-  String? _errorMessage;
-  bool _isLoading = false;
-
-  // Brute Force Protection
-  int _failedAttempts = 0;
-  int _lockoutSeconds = 0;
-  Timer? _lockoutTimer;
-
   // Stored authorized accounts
   final Map<String, String> _registeredAccounts = {
     'kushbinary': 'Admin@1994',
@@ -54,90 +58,117 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _checkSavedSessionAndAuthenticate();
+    _checkSavedSessionAndPin();
   }
 
-  @override
-  void dispose() {
-    _lockoutTimer?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _checkSavedSessionAndAuthenticate() async {
+  Future<void> _checkSavedSessionAndPin() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final savedUser = prefs.getString('current_logged_in_user');
+      final pin = prefs.getString('library_user_4digit_pin_${savedUser ?? "kushbinary"}');
       final hasLoggedIn = prefs.getBool('has_logged_in_before') ?? false;
 
       await _loadCustomAccounts();
 
       if (hasLoggedIn && savedUser != null && savedUser.isNotEmpty) {
         setState(() {
-          _savedUsername = savedUser;
-          _isQuickUnlockMode = true;
+          _currentUser = savedUser;
+          _savedPin = pin;
+          if (pin != null && pin.length == 4) {
+            _authMode = AuthMode.enterPin;
+          } else {
+            _authMode = AuthMode.createPin;
+          }
         });
 
-        // Trigger Biometric / Screen Lock automatically
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _authenticateWithDeviceLock();
+        // Trigger biometrics optionally if on Android
+        if (_authMode == AuthMode.enterPin) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _authenticateWithBiometricsSilently();
+          });
+        }
+      } else {
+        setState(() {
+          _authMode = AuthMode.passwordLogin;
         });
       }
     } catch (_) {}
   }
 
-  Future<void> _authenticateWithDeviceLock() async {
-    if (_isAuthenticating) return;
+  Future<void> _authenticateWithBiometricsSilently() async {
+    if (kIsWeb) return;
+    try {
+      final canCheck = await _localAuth.canCheckBiometrics || await _localAuth.isDeviceSupported();
+      if (canCheck) {
+        final didAuth = await _localAuth.authenticate(
+          localizedReason: 'Confirm fingerprint or screen lock to unlock MyLibbook',
+          options: const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
+        );
+        if (didAuth) {
+          _unlockAndProceed();
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _onKeypadTap(String value) {
+    if (_enteredPin.length >= 4) return;
     setState(() {
-      _isAuthenticating = true;
+      _enteredPin += value;
       _errorMessage = null;
     });
 
-    try {
-      if (kIsWeb) {
-        // On Web, if logged in before, unlock directly or allow 1-click
-        await Future.delayed(const Duration(milliseconds: 300));
-        _navigateToHome(_savedUsername ?? 'kushbinary');
-        return;
-      }
+    if (_enteredPin.length == 4) {
+      _handlePinComplete();
+    }
+  }
 
-      final canAuthenticateWithBiometrics = await _localAuth.canCheckBiometrics;
-      final canAuthenticate = canAuthenticateWithBiometrics || await _localAuth.isDeviceSupported();
-
-      if (canAuthenticate) {
-        final bool didAuthenticate = await _localAuth.authenticate(
-          localizedReason: 'Confirm screen lock pattern, PIN, or fingerprint to unlock MyLibbook',
-          options: const AuthenticationOptions(
-            biometricOnly: false, // Allows PIN, Pattern, Password as well as Biometric
-            stickyAuth: true,
-            useErrorDialogs: true,
-          ),
-        );
-
-        if (didAuthenticate) {
-          _navigateToHome(_savedUsername ?? 'kushbinary');
-          return;
-        } else {
-          setState(() {
-            _errorMessage = 'Authentication cancelled. Tap below to unlock.';
-          });
-        }
-      } else {
-        // Device does not support screen lock or biometrics, open dashboard
-        _navigateToHome(_savedUsername ?? 'kushbinary');
-      }
-    } catch (e) {
+  void _onBackspaceTap() {
+    if (_enteredPin.isNotEmpty) {
       setState(() {
-        _errorMessage = 'Lock verification failed. Tap to retry or use password.';
+        _enteredPin = _enteredPin.substring(0, _enteredPin.length - 1);
+        _errorMessage = null;
       });
-    } finally {
-      if (mounted) {
-        setState(() => _isAuthenticating = false);
+    }
+  }
+
+  Future<void> _handlePinComplete() async {
+    if (_authMode == AuthMode.enterPin) {
+      if (_enteredPin == _savedPin) {
+        _unlockAndProceed();
+      } else {
+        setState(() {
+          _errorMessage = 'Galat PIN! Kripya sahi 4-digit PIN enter karein.';
+          _enteredPin = '';
+        });
+      }
+    } else if (_authMode == AuthMode.createPin) {
+      setState(() {
+        _tempCreatedPin = _enteredPin;
+        _enteredPin = '';
+        _authMode = AuthMode.confirmPin;
+        _errorMessage = null;
+      });
+    } else if (_authMode == AuthMode.confirmPin) {
+      if (_enteredPin == _tempCreatedPin) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('library_user_4digit_pin_$_currentUser', _enteredPin);
+        setState(() {
+          _savedPin = _enteredPin;
+        });
+        _unlockAndProceed();
+      } else {
+        setState(() {
+          _errorMessage = 'PIN match nahi hua! Dobara create karein.';
+          _enteredPin = '';
+          _tempCreatedPin = '';
+          _authMode = AuthMode.createPin;
+        });
       }
     }
   }
 
-  void _navigateToHome(String username) {
-    if (!mounted) return;
+  void _unlockAndProceed() {
     Navigator.pushReplacementNamed(context, '/home');
   }
 
@@ -158,43 +189,11 @@ class _LoginScreenState extends State<LoginScreen> {
     _registeredAccounts[user.toLowerCase()] = pass;
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        'library_secure_users',
-        json.encode(_registeredAccounts),
-      );
+      await prefs.setString('library_secure_users', json.encode(_registeredAccounts));
     } catch (_) {}
   }
 
-  void _startLockoutTimer() {
-    setState(() {
-      _lockoutSeconds = 60;
-      _errorMessage =
-          'Security Alert: 5 galat attempts! System 60 seconds ke liye lock ho gaya hai.';
-    });
-
-    _lockoutTimer?.cancel();
-    _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) return;
-      if (_lockoutSeconds > 1) {
-        setState(() {
-          _lockoutSeconds--;
-          _errorMessage =
-              'Security Lockout: Kripya $_lockoutSeconds seconds wait karein.';
-        });
-      } else {
-        _lockoutTimer?.cancel();
-        setState(() {
-          _lockoutSeconds = 0;
-          _failedAttempts = 0;
-          _errorMessage = null;
-        });
-      }
-    });
-  }
-
-  Future<void> _handleLogin() async {
-    if (_lockoutSeconds > 0) return;
-
+  Future<void> _handlePasswordLogin() async {
     final user = _loginUserCtrl.text.trim();
     final pass = _loginPassCtrl.text;
 
@@ -211,32 +210,29 @@ class _LoginScreenState extends State<LoginScreen> {
     await Future.delayed(const Duration(milliseconds: 300));
 
     final normalizedUser = user.toLowerCase();
-    if (_registeredAccounts.containsKey(normalizedUser) &&
-        _registeredAccounts[normalizedUser] == pass) {
-      _failedAttempts = 0;
-
-      // Save persistent session for Screen Lock Auto-Unlock
+    if (_registeredAccounts.containsKey(normalizedUser) && _registeredAccounts[normalizedUser] == pass) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('current_logged_in_user', user);
       await prefs.setBool('has_logged_in_before', true);
 
-      if (mounted) {
-        _navigateToHome(user);
-      }
-    } else {
-      _failedAttempts++;
-      if (_failedAttempts >= 5) {
-        _startLockoutTimer();
-      } else {
-        setState(() {
-          _errorMessage =
-              'Galat Username ya Password! (${5 - _failedAttempts} attempts bache hain)';
-        });
-      }
-    }
+      final pin = prefs.getString('library_user_4digit_pin_$user');
 
-    if (mounted) {
-      setState(() => _isLoading = false);
+      setState(() {
+        _currentUser = user;
+        _isLoading = false;
+        if (pin != null && pin.length == 4) {
+          _savedPin = pin;
+          _unlockAndProceed();
+        } else {
+          _authMode = AuthMode.createPin;
+          _enteredPin = '';
+        }
+      });
+    } else {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Galat Username ya Password!';
+      });
     }
   }
 
@@ -253,15 +249,12 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (secKey != masterSecurityCode) {
-      setState(() {
-        _errorMessage =
-            'Galat Master Security Key! Naye admin register karne ke liye valid Master Key enter karein.';
-      });
+      setState(() => _errorMessage = 'Galat Master Security Key! Contact Admin.');
       return;
     }
 
     if (pass != confirmPass) {
-      setState(() => _errorMessage = 'Dono passwords match nahi kar rahe hain.');
+      setState(() => _errorMessage = 'Passwords match nahi kar rahe hain.');
       return;
     }
 
@@ -275,53 +268,54 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
 
-    await Future.delayed(const Duration(milliseconds: 400));
+    await Future.delayed(const Duration(milliseconds: 300));
 
     final cleanUser = name.replaceAll(' ', '').toLowerCase();
     await _saveCustomAccount(cleanUser, pass);
     await _saveCustomAccount(email.toLowerCase(), pass);
 
-    // Save session
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('current_logged_in_user', name);
     await prefs.setBool('has_logged_in_before', true);
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      _navigateToHome(name);
-    }
+    setState(() {
+      _currentUser = name;
+      _isLoading = false;
+      _authMode = AuthMode.createPin;
+      _enteredPin = '';
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
+      backgroundColor: const Color(0xFF0F172A),
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0, -0.6),
+            radius: 1.2,
             colors: [
-              const Color(0xFF1E1035),
-              Colors.deepPurple.shade900,
-              const Color(0xFF0F172A),
+              Color(0xFF1E1B4B),
+              Color(0xFF0F172A),
             ],
           ),
         ),
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-              child: Card(
-                elevation: 20,
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(28.0),
-                  child: _isQuickUnlockMode ? _buildQuickUnlockView(theme) : _buildPasswordLoginView(theme),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Card(
+                  elevation: 24,
+                  shadowColor: const Color(0xFF4338CA).withValues(alpha: 0.3),
+                  color: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+                    child: _isPinMode ? _buildPinView() : _buildPasswordOrSignupView(),
+                  ),
                 ),
               ),
             ),
@@ -331,76 +325,122 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ================= 1. QUICK UNLOCK WITH SCREEN LOCK / BIOMETRICS =================
-  Widget _buildQuickUnlockView(ThemeData theme) {
+  bool get _isPinMode =>
+      _authMode == AuthMode.enterPin ||
+      _authMode == AuthMode.createPin ||
+      _authMode == AuthMode.confirmPin;
+
+  // ================= 1. ULTRA-MODERN 4-DIGIT PIN KEYPAD VIEW =================
+  Widget _buildPinView() {
+    String title = 'Enter Quick PIN';
+    String subtitle = 'Apna 4-digit PIN enter karke instant unlock karein';
+    IconData headerIcon = Icons.lock_outline_rounded;
+
+    if (_authMode == AuthMode.createPin) {
+      title = 'Set 4-Digit Quick PIN';
+      subtitle = 'Baar-baar login se bachne ke liye 4-digit PIN banayein';
+      headerIcon = Icons.pin_outlined;
+    } else if (_authMode == AuthMode.confirmPin) {
+      title = 'Confirm Quick PIN';
+      subtitle = 'Confirmation ke liye dobara wahi 4-digit PIN dalein';
+      headerIcon = Icons.check_circle_outline_rounded;
+    }
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Official MyLibbook Logo
-        ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Image.asset(
-            'assets/images/logo.png',
-            height: 85,
-            fit: BoxFit.contain,
-            errorBuilder: (ctx, err, stack) => const Icon(
-              Icons.menu_book_rounded,
-              size: 60,
-              color: Color(0xFF1E3A8A),
+        // App Logo
+        Container(
+          width: 68,
+          height: 68,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(color: const Color(0xFF4338CA).withValues(alpha: 0.15), blurRadius: 16, offset: const Offset(0, 6)),
+            ],
+          ),
+          padding: const EdgeInsets.all(6),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.asset(
+              'assets/images/logo.png',
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Icon(Icons.menu_book_rounded, color: Color(0xFF4338CA), size: 36),
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
+        const SizedBox(height: 12),
+        const Text(
           'MyLibbook',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w900,
-            color: const Color(0xFF0F172A),
-            letterSpacing: 0.5,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: Color(0xFF1E1B4B), letterSpacing: 0.5),
         ),
         const Text(
           'Smart. Organized. Knowledge.',
-          style: TextStyle(
-            color: Color(0xFF0284C7),
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.3,
-          ),
+          style: TextStyle(color: Color(0xFF0284C7), fontSize: 11, fontWeight: FontWeight.w700),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 18),
 
-        // User Avatar Badge
+        // User Badge
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           decoration: BoxDecoration(
-            color: const Color(0xFFE0E7FF),
+            color: const Color(0xFFEEF2FF),
             borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFC7D2FE)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.account_circle_rounded, color: Color(0xFF4338CA), size: 20),
-              const SizedBox(width: 8),
+              Icon(headerIcon, size: 14, color: const Color(0xFF4338CA)),
+              const SizedBox(width: 6),
               Text(
-                'Welcome, ${_savedUsername ?? "Admin"}',
-                style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF312E81), fontSize: 14),
+                '$_currentUser',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF3730A3)),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
-
-        Text(
-          'Confirm your screen lock pattern, PIN, or password to unlock MyLibbook',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.grey.shade700, fontSize: 13, height: 1.3),
-        ),
+        const SizedBox(height: 10),
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: Color(0xFF0F172A))),
+        const SizedBox(height: 4),
+        Text(subtitle, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
         const SizedBox(height: 20),
+
+        // 4 Animated PIN Circles
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(4, (index) {
+            final isFilled = index < _enteredPin.length;
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 10),
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isFilled ? const Color(0xFF4338CA) : Colors.transparent,
+                border: Border.all(
+                  color: isFilled ? const Color(0xFF4338CA) : Colors.grey.shade400,
+                  width: 2.2,
+                ),
+                boxShadow: isFilled
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFF4338CA).withValues(alpha: 0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : [],
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 14),
 
         if (_errorMessage != null) ...[
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: Colors.red.shade50,
               borderRadius: BorderRadius.circular(10),
@@ -408,95 +448,148 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             child: Text(
               _errorMessage!,
-              style: TextStyle(color: Colors.red.shade800, fontSize: 12, fontWeight: FontWeight.bold),
+              style: TextStyle(color: Colors.red.shade800, fontSize: 11, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
         ],
 
-        // Big Unlock Button
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4338CA),
-              foregroundColor: Colors.white,
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        // Sleek Custom Numeric Keypad
+        const SizedBox(height: 6),
+        Column(
+          children: [
+            _buildKeypadRow(['1', '2', '3']),
+            const SizedBox(height: 12),
+            _buildKeypadRow(['4', '5', '6']),
+            const SizedBox(height: 12),
+            _buildKeypadRow(['7', '8', '9']),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // Biometrics / Clear button
+                SizedBox(
+                  width: 68,
+                  height: 60,
+                  child: IconButton(
+                    icon: const Icon(Icons.fingerprint_rounded, size: 28, color: Color(0xFF4338CA)),
+                    tooltip: 'Use Fingerprint / Screen Lock',
+                    onPressed: _authenticateWithBiometricsSilently,
+                  ),
+                ),
+                _buildKeypadButton('0'),
+                SizedBox(
+                  width: 68,
+                  height: 60,
+                  child: IconButton(
+                    icon: const Icon(Icons.backspace_outlined, size: 22, color: Colors.black87),
+                    tooltip: 'Backspace',
+                    onPressed: _onBackspaceTap,
+                  ),
+                ),
+              ],
             ),
-            onPressed: _authenticateWithDeviceLock,
-            icon: _isAuthenticating
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.fingerprint_rounded, size: 24),
-            label: Text(
-              _isAuthenticating ? 'Verifying...' : 'Unlock MyLibbook',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-          ),
+          ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 18),
 
-        // Option to switch account / enter password manually
+        // Switch to Password Login
         TextButton.icon(
           onPressed: () {
             setState(() {
-              _isQuickUnlockMode = false;
+              _authMode = AuthMode.passwordLogin;
+              _enteredPin = '';
               _errorMessage = null;
             });
           },
-          icon: const Icon(Icons.key_rounded, size: 16),
-          label: const Text('Login with Password / Switch Account', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          icon: const Icon(Icons.password_rounded, size: 16),
+          label: const Text('Login with Password / Switch Account', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
         ),
       ],
     );
   }
 
-  // ================= 2. PASSWORD LOGIN / SIGN UP VIEW =================
-  Widget _buildPasswordLoginView(ThemeData theme) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Official MyLibbook Logo
-        ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Image.asset(
-            'assets/images/logo.png',
-            height: 85,
-            fit: BoxFit.contain,
-            errorBuilder: (ctx, err, stack) => const Icon(
-              Icons.menu_book_rounded,
-              size: 60,
-              color: Color(0xFF1E3A8A),
+  Widget _buildKeypadRow(List<String> keys) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: keys.map((k) => _buildKeypadButton(k)).toList(),
+    );
+  }
+
+  Widget _buildKeypadButton(String digit) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _onKeypadTap(digit),
+        borderRadius: BorderRadius.circular(30),
+        child: Container(
+          width: 68,
+          height: 60,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Center(
+            child: Text(
+              digit,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1E293B),
+              ),
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          'MyLibbook',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w900,
-            color: const Color(0xFF0F172A),
-            letterSpacing: 0.5,
+      ),
+    );
+  }
+
+  // ================= 2. PASSWORD LOGIN / SIGN UP VIEW =================
+  Widget _buildPasswordOrSignupView() {
+    final isLogin = _authMode == AuthMode.passwordLogin;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // App Logo
+        Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(color: const Color(0xFF4338CA).withValues(alpha: 0.15), blurRadius: 16, offset: const Offset(0, 6)),
+            ],
           ),
+          padding: const EdgeInsets.all(6),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Image.asset(
+              'assets/images/logo.png',
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Icon(Icons.menu_book_rounded, color: Color(0xFF4338CA), size: 36),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'MyLibbook',
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: Color(0xFF1E1B4B), letterSpacing: 0.5),
         ),
         const Text(
           'Smart. Organized. Knowledge.',
-          style: TextStyle(
-            color: Color(0xFF0284C7),
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.3,
-          ),
+          style: TextStyle(color: Color(0xFF0284C7), fontSize: 12, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 20),
 
         // Toggle Buttons (Login / Register)
         Container(
           decoration: BoxDecoration(
-            color: Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(12),
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(14),
           ),
           padding: const EdgeInsets.all(4),
           child: Row(
@@ -504,20 +597,17 @@ class _LoginScreenState extends State<LoginScreen> {
               Expanded(
                 child: GestureDetector(
                   onTap: () => setState(() {
-                    _isLogin = true;
+                    _authMode = AuthMode.passwordLogin;
                     _errorMessage = null;
                   }),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
-                      color: _isLogin ? Colors.white : Colors.transparent,
+                      color: isLogin ? Colors.white : Colors.transparent,
                       borderRadius: BorderRadius.circular(10),
-                      boxShadow: _isLogin
+                      boxShadow: isLogin
                           ? [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 4,
-                              ),
+                              BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4),
                             ]
                           : [],
                     ),
@@ -526,7 +616,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         'Secure Login',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: _isLogin ? const Color(0xFF4338CA) : Colors.grey.shade600,
+                          color: isLogin ? const Color(0xFF4338CA) : Colors.grey.shade600,
                         ),
                       ),
                     ),
@@ -536,20 +626,17 @@ class _LoginScreenState extends State<LoginScreen> {
               Expanded(
                 child: GestureDetector(
                   onTap: () => setState(() {
-                    _isLogin = false;
+                    _authMode = AuthMode.staffSignup;
                     _errorMessage = null;
                   }),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
-                      color: !_isLogin ? Colors.white : Colors.transparent,
+                      color: !isLogin ? Colors.white : Colors.transparent,
                       borderRadius: BorderRadius.circular(10),
-                      boxShadow: !_isLogin
+                      boxShadow: !isLogin
                           ? [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 4,
-                              ),
+                              BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4),
                             ]
                           : [],
                     ),
@@ -558,7 +645,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         'Register Staff',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: !_isLogin ? const Color(0xFF4338CA) : Colors.grey.shade600,
+                          color: !isLogin ? const Color(0xFF4338CA) : Colors.grey.shade600,
                         ),
                       ),
                     ),
@@ -580,16 +667,12 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                const Icon(Icons.error_outline, color: Colors.red, size: 18),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     _errorMessage!,
-                    style: TextStyle(
-                      color: Colors.red.shade800,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(color: Colors.red.shade800, fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -598,21 +681,21 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 16),
         ],
 
-        if (_isLogin) ...[
+        if (isLogin) ...[
           TextField(
             controller: _loginUserCtrl,
-            enabled: _lockoutSeconds == 0,
             decoration: InputDecoration(
               labelText: 'Username or Email',
               prefixIcon: const Icon(Icons.account_circle_outlined),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           TextField(
             controller: _loginPassCtrl,
             obscureText: _obscureLoginPass,
-            enabled: _lockoutSeconds == 0,
             decoration: InputDecoration(
               labelText: 'Password',
               prefixIcon: const Icon(Icons.lock_outline),
@@ -620,27 +703,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 icon: Icon(_obscureLoginPass ? Icons.visibility_off : Icons.visibility),
                 onPressed: () => setState(() => _obscureLoginPass = !_obscureLoginPass),
               ),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 22),
           SizedBox(
             width: double.infinity,
-            height: 48,
+            height: 50,
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: _lockoutSeconds > 0 ? Colors.grey : const Color(0xFF4338CA),
+                backgroundColor: const Color(0xFF4338CA),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 3,
               ),
-              onPressed: (_isLoading || _lockoutSeconds > 0) ? null : _handleLogin,
+              onPressed: _isLoading ? null : _handlePasswordLogin,
               icon: _isLoading
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.lock_open_rounded),
-              label: Text(
-                _lockoutSeconds > 0 ? 'Locked (${_lockoutSeconds}s)' : 'Authenticate & Enter',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
+                  : const Icon(Icons.login_rounded),
+              label: const Text('Login & Setup Quick PIN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             ),
           ),
         ] else ...[
@@ -649,7 +732,9 @@ class _LoginScreenState extends State<LoginScreen> {
             decoration: InputDecoration(
               labelText: 'Staff Name / Username',
               prefixIcon: const Icon(Icons.person_outline),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),
           const SizedBox(height: 12),
@@ -658,7 +743,9 @@ class _LoginScreenState extends State<LoginScreen> {
             decoration: InputDecoration(
               labelText: 'Email Address',
               prefixIcon: const Icon(Icons.email_outlined),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),
           const SizedBox(height: 12),
@@ -672,7 +759,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 icon: Icon(_obscureSecurityKey ? Icons.visibility_off : Icons.visibility),
                 onPressed: () => setState(() => _obscureSecurityKey = !_obscureSecurityKey),
               ),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),
           const SizedBox(height: 12),
@@ -686,7 +775,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 icon: Icon(_obscureSignupPass ? Icons.visibility_off : Icons.visibility),
                 onPressed: () => setState(() => _obscureSignupPass = !_obscureSignupPass),
               ),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),
           const SizedBox(height: 12),
@@ -700,40 +791,42 @@ class _LoginScreenState extends State<LoginScreen> {
                 icon: Icon(_obscureSignupConfirmPass ? Icons.visibility_off : Icons.visibility),
                 onPressed: () => setState(() => _obscureSignupConfirmPass = !_obscureSignupConfirmPass),
               ),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
-            height: 48,
+            height: 50,
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF4338CA),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
               onPressed: _isLoading ? null : _handleSignup,
               icon: _isLoading
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.how_to_reg_rounded),
-              label: const Text('Create Account & Login', style: TextStyle(fontWeight: FontWeight.bold)),
+              label: const Text('Create Account & Setup PIN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             ),
           ),
         ],
 
-        if (_savedUsername != null && _savedUsername!.isNotEmpty) ...[
+        if (_savedPin != null && _savedPin!.isNotEmpty) ...[
           const SizedBox(height: 14),
           TextButton.icon(
             onPressed: () {
               setState(() {
-                _isQuickUnlockMode = true;
+                _authMode = AuthMode.enterPin;
+                _enteredPin = '';
                 _errorMessage = null;
               });
-              _authenticateWithDeviceLock();
             },
-            icon: const Icon(Icons.fingerprint_rounded, size: 18),
-            label: Text('Use Screen Lock / Fingerprint for $_savedUsername', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            icon: const Icon(Icons.dialpad_rounded, size: 18),
+            label: Text('Use 4-Digit Quick PIN for $_currentUser', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           ),
         ],
       ],
