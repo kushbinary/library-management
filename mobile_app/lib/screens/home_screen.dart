@@ -981,16 +981,38 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            const Text(
-              'Library Hub Pro',
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 0.5),
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              padding: const EdgeInsets.all(2),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(Icons.menu_book_rounded, color: Color(0xFF4338CA), size: 20),
+                ),
+              ),
             ),
-            Text(
-              'Admin: $_currentUser',
-              style: const TextStyle(fontSize: 11, color: Colors.white70),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'MyLibbook',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 0.5),
+                ),
+                Text(
+                  'Admin: $_currentUser',
+                  style: const TextStyle(fontSize: 11, color: Colors.white70),
+                ),
+              ],
             ),
           ],
         ),

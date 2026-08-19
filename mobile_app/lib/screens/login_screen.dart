@@ -265,42 +265,37 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Lock & Shield Icon
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.deepPurple.shade50,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.shield_rounded,
-                          size: 44,
-                          color: Colors.deepPurple.shade700,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Secure Library Hub',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.deepPurple.shade900,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.lock_outline, size: 13, color: Colors.grey.shade600),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Authorized Personnel Access Only',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
+                      // Official MyLibbook Logo
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          height: 85,
+                          fit: BoxFit.contain,
+                          errorBuilder: (ctx, err, stack) => Icon(
+                            Icons.menu_book_rounded,
+                            size: 60,
+                            color: const Color(0xFF1E3A8A),
                           ),
-                        ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'MyLibbook',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          color: const Color(0xFF0F172A),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const Text(
+                        'Smart. Organized. Knowledge.',
+                        style: TextStyle(
+                          color: Color(0xFF0284C7),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
+                        ),
                       ),
                       const SizedBox(height: 20),
 

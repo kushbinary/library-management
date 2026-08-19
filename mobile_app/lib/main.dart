@@ -15,10 +15,10 @@ class LibraryApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Library Management',
+      title: 'MyLibbook',
       theme: ThemeData(
         useMaterial3: true,
-        colorSchemeSeed: Colors.deepPurple,
+        colorSchemeSeed: const Color(0xFF4338CA),
         fontFamily: 'Roboto',
       ),
       initialRoute: '/',
