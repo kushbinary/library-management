@@ -1177,6 +1177,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         elevation: 0,
         actions: [
           IconButton(
+            tooltip: 'Settings',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () async {
+              await Navigator.pushNamed(context, '/settings');
+              _initUserAndLoad();
+            },
+          ),
+          IconButton(
             tooltip: 'UPI QR Settings',
             icon: const Icon(Icons.qr_code_2_rounded),
             onPressed: _showUpiSettingsDialog,

@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -20,9 +18,7 @@ enum AuthMode {
   staffSignup,
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
-  final LocalAuthentication _localAuth = LocalAuthentication();
-  
+class _LoginScreenState extends State<LoginScreen> {
   AuthMode _authMode = AuthMode.passwordLogin;
   String _enteredPin = '';
   String _tempCreatedPin = '';
@@ -67,46 +63,31 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       final savedUser = prefs.getString('current_logged_in_user');
       final pin = prefs.getString('library_user_4digit_pin_${savedUser ?? "kushbinary"}');
       final hasLoggedIn = prefs.getBool('has_logged_in_before') ?? false;
+      final isLockEnabled = prefs.getBool('app_lock_4digit_enabled') ?? true;
 
       await _loadCustomAccounts();
 
       if (hasLoggedIn && savedUser != null && savedUser.isNotEmpty) {
+        _currentUser = savedUser;
+        _savedPin = pin;
+
+        if (!isLockEnabled) {
+          // If lock is disabled in settings, open dashboard directly!
+          _unlockAndProceed();
+          return;
+        }
+
         setState(() {
-          _currentUser = savedUser;
-          _savedPin = pin;
           if (pin != null && pin.length == 4) {
             _authMode = AuthMode.enterPin;
           } else {
             _authMode = AuthMode.createPin;
           }
         });
-
-        // Trigger biometrics optionally if on Android
-        if (_authMode == AuthMode.enterPin) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _authenticateWithBiometricsSilently();
-          });
-        }
       } else {
         setState(() {
           _authMode = AuthMode.passwordLogin;
         });
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _authenticateWithBiometricsSilently() async {
-    if (kIsWeb) return;
-    try {
-      final canCheck = await _localAuth.canCheckBiometrics || await _localAuth.isDeviceSupported();
-      if (canCheck) {
-        final didAuth = await _localAuth.authenticate(
-          localizedReason: 'Confirm fingerprint or screen lock to unlock MyLibbook',
-          options: const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
-        );
-        if (didAuth) {
-          _unlockAndProceed();
-        }
       }
     } catch (_) {}
   }
@@ -153,6 +134,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       if (_enteredPin == _tempCreatedPin) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('library_user_4digit_pin_$_currentUser', _enteredPin);
+        await prefs.setBool('app_lock_4digit_enabled', true);
         setState(() {
           _savedPin = _enteredPin;
         });
@@ -332,7 +314,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
   // ================= 1. ULTRA-MODERN 4-DIGIT PIN KEYPAD VIEW =================
   Widget _buildPinView() {
-    String title = 'Enter Quick PIN';
+    String title = 'Enter 4-Digit Quick PIN';
     String subtitle = 'Apna 4-digit PIN enter karke instant unlock karein';
     IconData headerIcon = Icons.lock_outline_rounded;
 
@@ -468,14 +450,14 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                // Biometrics / Clear button
+                // Clear button
                 SizedBox(
                   width: 68,
                   height: 60,
                   child: IconButton(
-                    icon: const Icon(Icons.fingerprint_rounded, size: 28, color: Color(0xFF4338CA)),
-                    tooltip: 'Use Fingerprint / Screen Lock',
-                    onPressed: _authenticateWithBiometricsSilently,
+                    icon: const Icon(Icons.refresh_rounded, size: 22, color: Colors.grey),
+                    tooltip: 'Clear PIN',
+                    onPressed: () => setState(() => _enteredPin = ''),
                   ),
                 ),
                 _buildKeypadButton('0'),
@@ -522,7 +504,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       color: Colors.transparent,
       child: InkWell(
         onTap: () => _onKeypadTap(digit),
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(20),
         child: Container(
           width: 68,
           height: 60,
