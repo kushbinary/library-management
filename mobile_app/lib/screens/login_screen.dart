@@ -150,7 +150,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
       final pin = prefs.getString('library_user_4digit_pin_$username');
       if (pin == null || pin.length != 4) {
-        // Prompt to set 4-digit PIN for quick login
         if (mounted) {
           _promptSetQuickPin(username);
         }
@@ -207,7 +206,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       await prefs.setBool('has_logged_in_before', true);
 
       if (mounted) {
-        // Prompt to create 4-digit PIN immediately
         _promptSetQuickPin(username, isNewAccount: true);
       }
     } else {
@@ -284,7 +282,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               ),
                             ),
                             Text(
-                              'क्विक लॉगिन के लिए 4 अंकों का PIN सेट करें',
+                              'Fast & secure one-touch login',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -321,9 +319,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       letterSpacing: 8,
                       color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
-                    decoration: InputDecoration(
-                      labelText: 'Enter 4-Digit PIN (4 अंकों का PIN)',
-                      prefixIcon: const Icon(Icons.dialpad_rounded),
+                    decoration: const InputDecoration(
+                      labelText: 'Enter 4-Digit PIN',
+                      prefixIcon: Icon(Icons.dialpad_rounded),
                       counterText: '',
                     ),
                   ),
@@ -339,9 +337,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       letterSpacing: 8,
                       color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
-                    decoration: InputDecoration(
-                      labelText: 'Confirm 4-Digit PIN (PIN दोबारा डालें)',
-                      prefixIcon: const Icon(Icons.shield_outlined),
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm 4-Digit PIN',
+                      prefixIcon: Icon(Icons.shield_outlined),
                       counterText: '',
                     ),
                   ),
@@ -382,7 +380,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       }
                     },
                     child: const Text(
-                      'Save PIN & Continue (PIN सुरक्षित करें)',
+                      'Save PIN & Continue',
                       style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
                     ),
                   ),
@@ -393,7 +391,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       Navigator.pushReplacementNamed(context, '/home');
                     },
                     child: Text(
-                      'Skip for now (बाद में सेट करें)',
+                      'Skip for now',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
@@ -420,7 +418,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       color: isDark ? Colors.white : const Color(0xFF0F172A),
     );
 
-    // Render Quick PIN Unlock Screen if user has configured a PIN
+    // Quick PIN Unlock Screen
     if (_showPinMode && _savedPin != null) {
       return Scaffold(
         backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFEEF2FF),
@@ -431,30 +429,53 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  // App Logo with modern container
                   Container(
-                    padding: const EdgeInsets.all(18),
+                    width: 100,
+                    height: 100,
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: primaryColor.withValues(alpha: 0.14),
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
                       shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withValues(alpha: 0.2),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        width: 2,
+                      ),
                     ),
-                    child: Icon(Icons.lock_person_rounded, size: 44, color: primaryColor),
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Icon(
+                        Icons.local_library_rounded,
+                        size: 48,
+                        color: primaryColor,
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   Text(
                     _savedLibraryName ?? 'MyLibbook',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
                       color: isDark ? Colors.white : const Color(0xFF1E1B4B),
+                      letterSpacing: -0.5,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Welcome, ${_savedUsername ?? "Admin"}',
+                    'Welcome back, ${_savedUsername ?? "Admin"}',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                      color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -476,7 +497,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     child: Column(
                       children: [
                         Text(
-                          'Enter 4-Digit Quick PIN (PIN दर्ज करें)',
+                          'Enter 4-Digit Quick PIN',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
@@ -536,7 +557,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
-                              // Empty placeholder
                               const SizedBox(width: 72, height: 72),
                               _buildKeypadButton('0', isDark),
                               SizedBox(
@@ -568,7 +588,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     }),
                     icon: Icon(Icons.password_rounded, size: 18, color: primaryColor),
                     label: Text(
-                      'Login with Password (पासवर्ड से लॉगिन करें)',
+                      'Login with Password',
                       style: TextStyle(fontWeight: FontWeight.w800, color: primaryColor, fontSize: 14),
                     ),
                   ),
@@ -590,17 +610,34 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Top Header Branding
+                // Top Header with MyLibbook Logo
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  width: 104,
+                  height: 104,
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: primaryColor.withValues(alpha: 0.12),
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: primaryColor.withValues(alpha: 0.22),
+                        blurRadius: 24,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      width: 2,
+                    ),
                   ),
-                  child: Icon(
-                    Icons.local_library_rounded,
-                    size: 48,
-                    color: primaryColor,
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                      Icons.local_library_rounded,
+                      size: 52,
+                      color: primaryColor,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -696,8 +733,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                           unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                           tabs: const [
-                            Tab(text: 'Sign In (लॉगिन)'),
-                            Tab(text: 'Sign Up (खाता बनाएं)'),
+                            Tab(text: 'Sign In'),
+                            Tab(text: 'Sign Up'),
                           ],
                         ),
                       ),
@@ -807,7 +844,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                         keyboardType: TextInputType.phone,
                                         style: textStyle,
                                         decoration: InputDecoration(
-                                          labelText: 'Mobile Number (WhatsApp)',
+                                          labelText: 'Mobile Number / WhatsApp',
                                           hintText: 'e.g. 9838127461',
                                           prefixIcon: Icon(Icons.phone_rounded, color: primaryColor, size: 20),
                                         ),
@@ -886,7 +923,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     onPressed: () => setState(() => _showPinMode = true),
                     icon: Icon(Icons.dialpad_rounded, size: 18, color: primaryColor),
                     label: Text(
-                      'Use 4-Digit Quick PIN (PIN से लॉगिन करें)',
+                      'Use 4-Digit Quick PIN',
                       style: TextStyle(fontWeight: FontWeight.w800, color: primaryColor, fontSize: 14),
                     ),
                   ),
