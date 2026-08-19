@@ -670,32 +670,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 12),
                   const Divider(),
-                  const SizedBox(height: 8),
-                  Text(
-                    isHi
-                        ? 'MyLibbook एक आधुनिक डिजिटल लाइब्रेरी प्रबंधन प्रणाली है, जो स्मार्ट सीट आवंटन, स्वचालित WhatsApp सूचनाएं, UPI QR शुल्क संग्रह और त्वरित 4-अंकीय सुरक्षा पिन प्रदान करता है।'
-                        : 'MyLibbook is an automated digital library management platform providing intelligent seat allocation matrices, direct WhatsApp reminders, UPI QR payments, and secure 4-digit PIN authentication.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.4),
-                  ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
                     decoration: BoxDecoration(
                       color: isDark ? Colors.grey.shade900 : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
                     ),
                     child: Column(
                       children: [
                         const Text(
                           '© 2026 MyLibbook. All Rights Reserved.',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF4338CA)),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF4338CA)),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
                         Text(
                           'Designed & Developed by Kush Binary',
-                          style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
                         ),
                       ],
                     ),
