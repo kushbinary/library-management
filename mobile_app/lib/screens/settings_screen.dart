@@ -422,11 +422,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   SwitchListTile(
                     title: Text(
                       isHi ? '4-Digit Quick PIN लॉक' : '4-Digit Quick PIN Lock',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: isDark ? Colors.white : const Color(0xFF1E1B4B)),
                     ),
                     subtitle: Text(
                       isHi ? 'ऐप खोलते ही 4-अंकीय PIN द्वारा तुरंत अनलॉक करें' : 'Enable instant 4-digit PIN unlock on app launch',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600),
                     ),
                     secondary: Container(
                       padding: const EdgeInsets.all(8),
@@ -452,11 +452,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       leading: const Icon(Icons.edit_rounded, color: Color(0xFF4338CA)),
                       title: Text(
                         isHi ? '4-Digit PIN बदलें' : 'Change 4-Digit PIN',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF1E1B4B)),
                       ),
                       subtitle: Text(
                         _currentPin != null ? (isHi ? 'PIN सक्रिय है (••••)' : 'PIN is active (••••)') : (isHi ? 'कोई PIN सेट नहीं है' : 'No PIN configured'),
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600),
                       ),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: _showChangePinDialog,
@@ -469,7 +469,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 20),
 
           // 3. THEME MODE SECTION
-          _buildSectionHeader(isHi ? 'थीम मोड (Theme Mode)' : 'Appearance & Theme', Icons.palette_outlined),
+          _buildSectionHeader(isHi ? 'थीम मोड' : 'Appearance & Theme', Icons.palette_outlined),
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -478,28 +478,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 children: [
                   RadioListTile<ThemeMode>(
-                    title: Text(isHi ? '☀️ लाइट मोड (Light Theme)' : '☀️ Light Theme', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    title: Text(isHi ? 'लाइट मोड' : 'Light Theme', style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF1E1B4B))),
+                    subtitle: Text(isHi ? 'हल्का रंग' : 'Bright interface', style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600)),
                     value: ThemeMode.light,
                     groupValue: _settings.themeMode,
-                    activeColor: const Color(0xFF4338CA),
+                    activeColor: isDark ? const Color(0xFF818CF8) : const Color(0xFF4338CA),
                     onChanged: (mode) {
                       if (mode != null) _settings.setThemeMode(mode);
                     },
                   ),
                   RadioListTile<ThemeMode>(
-                    title: Text(isHi ? '🌙 डार्क मोड (Dark Theme)' : '🌙 Dark Theme', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    title: Text(isHi ? 'डार्क मोड' : 'Dark Theme', style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF1E1B4B))),
+                    subtitle: Text(isHi ? 'गहरा रंग' : 'Dark interface', style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600)),
                     value: ThemeMode.dark,
                     groupValue: _settings.themeMode,
-                    activeColor: const Color(0xFF4338CA),
+                    activeColor: isDark ? const Color(0xFF818CF8) : const Color(0xFF4338CA),
                     onChanged: (mode) {
                       if (mode != null) _settings.setThemeMode(mode);
                     },
                   ),
                   RadioListTile<ThemeMode>(
-                    title: Text(isHi ? '⚙️ सिस्टम डिफॉल्ट (System Default)' : '⚙️ System Default', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    title: Text(isHi ? 'सिस्टम डिफॉल्ट' : 'System Default', style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF1E1B4B))),
+                    subtitle: Text(isHi ? 'फ़ोन सेटिंग के अनुसार' : 'Follow phone settings', style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600)),
                     value: ThemeMode.system,
                     groupValue: _settings.themeMode,
-                    activeColor: const Color(0xFF4338CA),
+                    activeColor: isDark ? const Color(0xFF818CF8) : const Color(0xFF4338CA),
                     onChanged: (mode) {
                       if (mode != null) _settings.setThemeMode(mode);
                     },
@@ -579,10 +582,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(10)),
                 child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.green),
               ),
-              title: Text(_settings.upiId, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              title: Text(_settings.upiId, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF1E1B4B))),
               subtitle: Text(
                 isHi ? 'प्राप्तकर्ता का नाम: ${_settings.businessName}' : 'Beneficiary Name: ${_settings.businessName}',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600),
               ),
               trailing: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4338CA), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4)),
@@ -606,8 +609,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(10)),
                     child: const Icon(Icons.chat_rounded, color: Colors.green),
                   ),
-                  title: Text(isHi ? 'WhatsApp सहायता' : 'WhatsApp Support', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: Text(isHi ? 'सीधे WhatsApp पर तकनीकी सहायता प्राप्त करें' : 'Get instant technical support on WhatsApp', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  title: Text(isHi ? 'WhatsApp सहायता' : 'WhatsApp Support', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF1E1B4B))),
+                  subtitle: Text(isHi ? 'सीधे WhatsApp पर तकनीकी सहायता प्राप्त करें' : 'Get instant technical support on WhatsApp', style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600)),
                   trailing: const Icon(Icons.open_in_new_rounded, size: 18),
                   onTap: _openSupportWhatsApp,
                 ),
@@ -618,8 +621,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(10)),
                     child: const Icon(Icons.email_outlined, color: Colors.blue),
                   ),
-                  title: Text(isHi ? 'ईमेल सहायता' : 'Email Support', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: const Text('kushbinary@gmail.com', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  title: Text(isHi ? 'ईमेल सहायता' : 'Email Support', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF1E1B4B))),
+                  subtitle: Text('kushbinary@gmail.com', style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : Colors.grey)),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () async {
                     final uri = Uri.parse('mailto:kushbinary@gmail.com?subject=MyLibbook%20Support');
@@ -655,14 +658,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                       const SizedBox(width: 14),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('MyLibbook Pro', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: Color(0xFF1E1B4B))),
-                            Text('Smart. Organized. Knowledge.', style: TextStyle(color: Color(0xFF0284C7), fontSize: 12, fontWeight: FontWeight.w600)),
-                            SizedBox(height: 2),
-                            Text('Version 1.0.0 (Official Release Build)', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                            Text('MyLibbook Pro', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: isDark ? Colors.white : const Color(0xFF1E1B4B))),
+                            Text('Smart. Organized. Knowledge.', style: TextStyle(color: isDark ? const Color(0xFF7DD3FC) : const Color(0xFF0284C7), fontSize: 12, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 2),
+                            Text('Version 1.0.0 (Official Release Build)', style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : Colors.grey)),
                           ],
                         ),
                       ),
@@ -704,15 +707,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildSectionHeader(String title, IconData icon) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: const Color(0xFF4338CA)),
+          Icon(icon, size: 18, color: isDark ? const Color(0xFF818CF8) : const Color(0xFF4338CA)),
           const SizedBox(width: 6),
           Text(
             title,
-            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFF1E1B4B), letterSpacing: 0.2),
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF1E1B4B), letterSpacing: 0.2),
           ),
         ],
       ),

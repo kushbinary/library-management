@@ -1135,7 +1135,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Row(
           children: [
@@ -1462,10 +1462,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         label: Text(f),
                         selected: isSelected,
                         onSelected: (_) => setState(() => _filter = f),
-                        selectedColor: const Color(0xFFE0E7FF),
-                        checkmarkColor: const Color(0xFF4338CA),
+                        selectedColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF312E81) : const Color(0xFFE0E7FF),
+                        checkmarkColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF818CF8) : const Color(0xFF4338CA),
                         labelStyle: TextStyle(
-                          color: isSelected ? const Color(0xFF312E81) : Colors.grey.shade800,
+                          color: isSelected
+                              ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFFA5B4FC) : const Color(0xFF312E81))
+                              : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFFCBD5E1) : Colors.grey.shade800),
                           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                           fontSize: 12,
                         ),
@@ -1519,7 +1521,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               ),
                             ),
                             elevation: 3,
-                            color: Colors.white,
+                            color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.white,
                             child: InkWell(
                               borderRadius: BorderRadius.circular(16),
                               onTap: () => _showEditStudentModal(s),
@@ -1583,7 +1585,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                                       style: TextStyle(
                                                         fontWeight: FontWeight.w900,
                                                         fontSize: 17,
-                                                        color: s.isExpired ? Colors.red.shade900 : const Color(0xFF1E1B4B),
+                                                        color: s.isExpired ? Colors.red.shade700 : (Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF1E1B4B)),
                                                         letterSpacing: 0.2,
                                                       ),
                                                       overflow: TextOverflow.ellipsis,
@@ -1620,7 +1622,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                                   const SizedBox(width: 3),
                                                   Text(
                                                     s.phone,
-                                                    style: TextStyle(color: Colors.grey.shade800, fontSize: 12, fontWeight: FontWeight.w600),
+                                                    style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFCBD5E1) : Colors.grey.shade800, fontSize: 12, fontWeight: FontWeight.w600),
                                                   ),
                                                   const SizedBox(width: 10),
                                                   Icon(Icons.payments_rounded, size: 13, color: Colors.teal.shade700),
@@ -1640,7 +1642,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                                   Expanded(
                                                     child: Text(
                                                       s.timing,
-                                                      style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                                                      style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFCBD5E1) : Colors.grey.shade700, fontSize: 12),
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
                                                   ),
@@ -1704,7 +1706,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFF1F5F9),
+                                        color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Row(
