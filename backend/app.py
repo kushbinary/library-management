@@ -1,38 +1,67 @@
 """
-Library Management Application - Backend API
+Library Management Application - Backend API & Cloud Portal
 
 Features:
-- Student registration with admission details
-- SQLite database persistence
+- Cloud-ready Database (PostgreSQL & SQLite auto-fallback)
+- User Authentication (Admin Login, Password hashing & session protection)
+- Student registration & seat management with admission details
 - WhatsApp integration via Twilio
-- Cron jobs for expired admission notifications
-- REST API endpoints
+- Expiry notification tracking & cron endpoints
+- REST API for Mobile App synchronization
+- Direct Android APK distribution
 """
 
 import os
 import datetime
-from flask import Flask, jsonify, request, render_template, flash, redirect, url_for, send_from_directory
+from functools import wraps
+from flask import Flask, jsonify, request, render_template, flash, redirect, url_for, send_from_directory, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
-from twilio.rest import Client
+from werkzeug.security import generate_password_hash, check_password_hash
 
-# Load environment variables
+# ----------------- App Configuration -----------------
+app = Flask(__name__, template_folder='templates', static_folder='static')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'library-secret-key-cloud-2026')
+
+# Database configuration: Cloud PostgreSQL or SQLite fallback
+database_url = os.environ.get('DATABASE_URL')
+if database_url:
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+else:
+    # Ensure database path is always absolute in the backend folder
+    db_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'library.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+CORS(app)
+db = SQLAlchemy(app)
+
+# Load Twilio environment variables
 TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', 'your_twilio_account_sid_here')
 TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', 'your_twilio_auth_token_here')
 TWILIO_WHATSAPP_NUMBER = os.environ.get('TWILIO_WHATSAPP_NUMBER', 'whatsapp:+14155238886')
 ADMIN_PHONE_NUMBER = os.environ.get('ADMIN_PHONE_NUMBER', 'whatsapp:+919999999999')
 
-app = Flask(__name__, template_folder='templates', static_folder='static')
-app.config['SECRET_KEY'] = 'dev-secret-key-change-in-production'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///library.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-CORS(app)
-db = SQLAlchemy(app)
+LIBRARY_CONFIG = {'total_seats': 50}
 
 # ==================== Database Models ====================
 
-# Library settings - total seat capacity
-LIBRARY_CONFIG = {'total_seats': 50}  # Adjust as needed
+class AdminUser(db.Model):
+    __tablename__ = 'admin_users'
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
 
 class Student(db.Model):
     __tablename__ = 'students'
@@ -63,10 +92,9 @@ class Student(db.Model):
         }
 
     def get_seat_status(self):
-        """Returns seat availability status"""
-        filled_seats = len(Student.query.all())
+        filled_seats = Student.query.count()
         total = LIBRARY_CONFIG['total_seats']
-        return {'filled': filled_seats, 'total': total, 'available': total - filled_seats}
+        return {'filled': filled_seats, 'total': total, 'available': max(0, total - filled_seats)}
 
     def days_remaining(self):
         if self.expiry_date:
@@ -80,83 +108,133 @@ class Student(db.Model):
         return False
 
 
+# ==================== Database Auto-Initialization ====================
+
+with app.app_context():
+    db.create_all()
+    # Create default admin account if not already created
+    default_admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
+    default_admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
+    existing_admin = AdminUser.query.filter_by(username=default_admin_username).first()
+    if not existing_admin:
+        new_admin = AdminUser(username=default_admin_username)
+        new_admin.set_password(default_admin_password)
+        db.session.add(new_admin)
+        db.session.commit()
+        print(f"[AUTH] Default admin created -> Username: {default_admin_username}")
+
+
+# ==================== Authentication Decorator ====================
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'admin_user' not in session:
+            flash('Please log in with your username and password to access this page.', 'warning')
+            return redirect(url_for('login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 # ==================== WhatsApp Service ====================
 
 def send_whatsapp_message(student_name, student_phone, message_type='registration'):
-    """
-    Send WhatsApp message via Twilio
-    Requires valid Twilio Account SID, Auth Token, and WhatsApp number
-    """
-    # In production, uncomment below:
-    # client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-    # client.messages.create(
-    #     body=message,
-    #     from_=TWILIO_WHATSAPP_NUMBER,
-    #     to=f'whatsapp:+91{student_phone}'
-    # )
-
-    # Development mode - log message
     if message_type == 'registration':
         message = (
             f"🌟 नई लाइब्रेरी रजिस्ट्रेशन 🎉\n\n"
-            f"नमस्त्र, {student_name}!\n"
+            f"नमस्ते, {student_name}!\n"
             f"आपका लाइब्रेरी मेंबरशिप सफलतापूर्वक रजिस्टर हो गई है।\n\n"
-            f"अपना सम्मान: एक धन्यवाद! 🙏"
+            f"धन्यवाद! 🙏"
         )
     elif message_type == 'expiry_warning':
         message = (
             f"⚠️ लाइब्रेरी मेम्बरशिप समाप्ति सूचना ⚠️\n\n"
-            f"नमस्त्र,\n"
+            f"नमस्ते {student_name},\n"
             f"आपका लाइब्रेरी मेम्बरशिप {datetime.date.today().strftime('%d %B %Y')} को समाप्त हो रहा है।\n"
-            f"कृपया नए से आवंटित करने के लिए संपर्क करें।\n\n"
+            f"कृपया नए से रिन्यू कराने के लिए संपर्क करें।\n\n"
             f"धन्यवाद! 🙏"
         )
+    else:
+        message = f"Library notification for {student_name}"
 
-    # Print message for development/testing
-    print(f"[WHATSAPP MESSAGE SENT]\nTo: {student_phone}\nType: {message_type}\nMessage:\n{message}\n")
-    return f"Message sent to {student_phone}"
+    print(f"[WHATSAPP MESSAGE SENT] To: {student_phone} | Type: {message_type}\n{message}\n")
+    return f"Message processed for {student_phone}"
 
 
-# ==================== Routes - Frontend & APK ====================
+# ==================== Authentication Routes ====================
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+
+        user = AdminUser.query.filter_by(username=username).first()
+        if user and user.check_password(password):
+            session['admin_user'] = user.username
+            session['user_id'] = user.id
+            flash(f'Welcome back, {user.username}!', 'success')
+            next_page = request.form.get('next') or url_for('student_list')
+            return redirect(next_page)
+        else:
+            flash('Invalid username or password. Please try again.', 'danger')
+
+    return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    session.pop('admin_user', None)
+    session.pop('user_id', None)
+    flash('You have been logged out successfully.', 'info')
+    return redirect(url_for('login'))
+
+
+@app.route('/change_password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    if request.method == 'POST':
+        current_password = request.form.get('current_password', '').strip()
+        new_password = request.form.get('new_password', '').strip()
+        confirm_password = request.form.get('confirm_password', '').strip()
+
+        user = AdminUser.query.filter_by(username=session['admin_user']).first()
+        if not user or not user.check_password(current_password):
+            flash('Current password is incorrect.', 'danger')
+            return render_template('change_password.html')
+
+        if new_password != confirm_password:
+            flash('New passwords do not match.', 'warning')
+            return render_template('change_password.html')
+
+        if len(new_password) < 4:
+            flash('Password must be at least 4 characters long.', 'warning')
+            return render_template('change_password.html')
+
+        user.set_password(new_password)
+        db.session.commit()
+        flash('Password changed successfully!', 'success')
+        return redirect(url_for('student_list'))
+
+    return render_template('change_password.html')
+
+
+# ==================== Frontend Routes ====================
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
 
-@app.route('/download-apk')
-@app.route('/download/LibraryHubPro.apk')
-def download_apk():
-    static_dir = os.path.join(app.root_path, 'static')
-    for fname in ['LibraryHubPro_v1.0.apk', 'LibraryHubPro.apk', 'MyLibbook_v1.0.apk']:
-        if os.path.exists(os.path.join(static_dir, fname)):
-            return send_from_directory(static_dir, fname, as_attachment=True, download_name='LibraryHubPro_v1.0.apk')
-    parent_dir = os.path.abspath(os.path.join(app.root_path, '..'))
-    for fname in ['LibraryHubPro_v1.0.apk', 'LibraryHubPro.apk', 'MyLibbook_v1.0.apk']:
-        if os.path.exists(os.path.join(parent_dir, fname)):
-            return send_from_directory(parent_dir, fname, as_attachment=True, download_name='LibraryHubPro_v1.0.apk')
-    return "APK not found on server", 404
-
-
-@app.route('/download/MyLibbook.apk')
-def download_mylibbook_apk():
-    static_dir = os.path.join(app.root_path, 'static')
-    if os.path.exists(os.path.join(static_dir, 'MyLibbook_v1.0.apk')):
-        return send_from_directory(static_dir, 'MyLibbook_v1.0.apk', as_attachment=True, download_name='MyLibbook_v1.0.apk')
-    parent_dir = os.path.abspath(os.path.join(app.root_path, '..'))
-    if os.path.exists(os.path.join(parent_dir, 'MyLibbook_v1.0.apk')):
-        return send_from_directory(parent_dir, 'MyLibbook_v1.0.apk', as_attachment=True, download_name='MyLibbook_v1.0.apk')
-    return "APK not found on server", 404
-
-
-
 @app.route('/students')
+@login_required
 def student_list():
     students = Student.query.order_by(Student.created_at.desc()).all()
     return render_template('students.html', students=students)
 
 
 @app.route('/add_student', methods=['GET', 'POST'])
+@login_required
 def add_student():
     if request.method == 'POST':
         name = request.form.get('name')
@@ -167,8 +245,18 @@ def add_student():
         seat_number = request.form.get('seat_number')
         expiry_date_str = request.form.get('expiry_date')
 
-        admission_date = datetime.datetime.strptime(admission_date_str, '%Y-%m-%d').date()
-        expiry_date = datetime.datetime.strptime(expiry_date_str, '%Y-%m-%d').date()
+        try:
+            admission_date = datetime.datetime.strptime(admission_date_str, '%Y-%m-%d').date()
+            expiry_date = datetime.datetime.strptime(expiry_date_str, '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            flash('Invalid date format. Please select valid dates.', 'danger')
+            return render_template('add_student.html')
+
+        # Check if seat is already occupied
+        existing_seat = Student.query.filter_by(seat_number=seat_number).first()
+        if existing_seat:
+            flash(f'Seat {seat_number} is already assigned to {existing_seat.name}. Please pick another seat.', 'danger')
+            return render_template('add_student.html')
 
         student = Student(
             name=name,
@@ -192,23 +280,68 @@ def add_student():
 
 
 @app.route('/student/<int:student_id>')
+@login_required
 def view_student(student_id):
     student = db.get_or_404(Student, student_id)
     return render_template('student_profile.html', student=student)
 
 
 @app.route('/student/<int:student_id>/send_reminder')
+@login_required
 def send_reminder(student_id):
     student = db.get_or_404(Student, student_id)
     if student.is_expired():
         send_whatsapp_message(student.name, student.phone, 'expiry_warning')
-        flash(f'Expiry reminder sent to {student.name}!')
+        flash(f'Expiry reminder sent to {student.name}!', 'success')
     else:
-        flash(f'{student.name} membership has not expired yet!')
+        flash(f'{student.name}\'s membership has not expired yet!', 'info')
     return redirect(url_for('view_student', student_id=student_id))
 
 
-# ==================== API Routes ====================
+# ==================== APK Download Routes ====================
+
+@app.route('/download-apk')
+@app.route('/download/LibraryHubPro.apk')
+def download_apk():
+    static_dir = os.path.join(app.root_path, 'static')
+    for fname in ['LibraryHubPro_v1.0.apk', 'LibraryHubPro.apk', 'MyLibbook_v1.0.apk']:
+        if os.path.exists(os.path.join(static_dir, fname)):
+            return send_from_directory(static_dir, fname, as_attachment=True, download_name='LibraryHubPro_v1.0.apk')
+    parent_dir = os.path.abspath(os.path.join(app.root_path, '..'))
+    for fname in ['LibraryHubPro_v1.0.apk', 'LibraryHubPro.apk', 'MyLibbook_v1.0.apk']:
+        if os.path.exists(os.path.join(parent_dir, fname)):
+            return send_from_directory(parent_dir, fname, as_attachment=True, download_name='LibraryHubPro_v1.0.apk')
+    return "APK file not found on server", 404
+
+
+@app.route('/download/MyLibbook.apk')
+def download_mylibbook_apk():
+    static_dir = os.path.join(app.root_path, 'static')
+    if os.path.exists(os.path.join(static_dir, 'MyLibbook_v1.0.apk')):
+        return send_from_directory(static_dir, 'MyLibbook_v1.0.apk', as_attachment=True, download_name='MyLibbook_v1.0.apk')
+    parent_dir = os.path.abspath(os.path.join(app.root_path, '..'))
+    if os.path.exists(os.path.join(parent_dir, 'MyLibbook_v1.0.apk')):
+        return send_from_directory(parent_dir, 'MyLibbook_v1.0.apk', as_attachment=True, download_name='MyLibbook_v1.0.apk')
+    return "APK not found on server", 404
+
+
+# ==================== REST API Routes ====================
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+
+    user = AdminUser.query.filter_by(username=username).first()
+    if user and user.check_password(password):
+        return jsonify({
+            'success': True,
+            'message': 'Login successful',
+            'username': user.username
+        }), 200
+    return jsonify({'success': False, 'error': 'Invalid username or password'}), 401
+
 
 @app.route('/api/students', methods=['GET'])
 def api_get_students():
@@ -218,7 +351,7 @@ def api_get_students():
 
 @app.route('/api/students', methods=['POST'])
 def api_add_student():
-    data = request.json
+    data = request.json or {}
     required_fields = ['name', 'email', 'phone', 'admission_date', 'timing', 'seat_number', 'expiry_date']
     missing = [f for f in required_fields if not data.get(f)]
 
@@ -228,7 +361,7 @@ def api_add_student():
     try:
         admission_date = datetime.datetime.strptime(data['admission_date'], '%Y-%m-%d').date()
         expiry_date = datetime.datetime.strptime(data['expiry_date'], '%Y-%m-%d').date()
-    except ValueError:
+    except (ValueError, TypeError):
         return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD.'}), 400
 
     student = Student(
@@ -263,15 +396,10 @@ def api_send_expiry_notifications():
     return jsonify({'message': f'Sent notifications to {len(expired)} expired memberships.'})
 
 
-# ==================== Scheduled Task ====================
-
 @app.route('/cron/send_expired_notifications')
 def cron_send_expired_notifications():
-    """This endpoint can be called by a cron job to send expired notifications daily"""
     return api_send_expiry_notifications()
 
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
     app.run(host='0.0.0.0', port=5000, debug=True)
