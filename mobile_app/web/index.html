@@ -1,46 +1,147 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
-
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="MyLibbook - Smart, Organized & Automated Library Management System">
+  
+  <!-- Anti-Cache Headers to ensure instant updates -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="library_management">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MyLibbook">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
+  <!-- Google Fonts: Plus Jakarta Sans & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
   <title>MyLibbook - Smart. Organized. Knowledge.</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    html, body {
+      height: 100%;
+      width: 100%;
+      background-color: #0F172A;
+      font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+    #loading-splash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 50% 30%, #1E1B4B 0%, #0F172A 100%);
+      z-index: 999999;
+      transition: opacity 0.4s ease-out;
+    }
+    .splash-card {
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 28px;
+      padding: 40px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 40px rgba(67, 56, 202, 0.25);
+      animation: floatPulse 3s ease-in-out infinite;
+    }
+    .splash-logo {
+      width: 80px;
+      height: 80px;
+      border-radius: 20px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      margin-bottom: 20px;
+      background: #FFFFFF;
+      padding: 6px;
+    }
+    .splash-title {
+      font-size: 26px;
+      font-weight: 900;
+      color: #FFFFFF;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .splash-tagline {
+      font-size: 13px;
+      font-weight: 600;
+      color: #38BDF8;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+    .spinner {
+      width: 38px;
+      height: 38px;
+      border: 3.5px solid rgba(255, 255, 255, 0.15);
+      border-top-color: #6366F1;
+      border-right-color: #38BDF8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes floatPulse {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+  </style>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
+  <div id="loading-splash">
+    <div class="splash-card">
+      <img src="icons/Icon-192.png" alt="MyLibbook" class="splash-logo" onerror="this.style.display='none'">
+      <div class="splash-title">MyLibbook</div>
+      <div class="splash-tagline">Smart • Organized • Knowledge</div>
+      <div class="spinner"></div>
+    </div>
+  </div>
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
-  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    window.addEventListener('load', function() {
+      // Remove loading splash when flutter is mounted
+      var checkFlutter = setInterval(function() {
+        var flutterHost = document.querySelector('flutter-view') || document.querySelector('flt-glass-pane');
+        if (flutterHost) {
+          var splash = document.getElementById('loading-splash');
+          if (splash) {
+            splash.style.opacity = '0';
+            setTimeout(function() {
+              splash.remove();
+            }, 400);
+          }
+          clearInterval(checkFlutter);
+        }
+      }, 100);
+    });
+  </script>
+  <script src="flutter_bootstrap.js?v=2.0" async></script>
 </body>
 </html>
