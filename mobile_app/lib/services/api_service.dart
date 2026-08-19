@@ -6,7 +6,7 @@ import '../models/student.dart';
 
 class ApiService {
   // Default Render Cloud Server URL
-  static const String defaultBaseUrl = 'https://library-management-1-k8m.onrender.com/api';
+  static const String defaultBaseUrl = 'https://library-management-1-k8rn.onrender.com/api';
 
   static Future<String> getBaseUrl() async {
     try {
