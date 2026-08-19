@@ -15,14 +15,18 @@
                 <p class="card-text text-muted mx-auto" style="max-width: 600px;">
                     Register new students, track their membership status, and send WhatsApp notifications about admission and expiry dates.
                 </p>
-                <div class="d-flex justify-content-center gap-3">
+                <div class="d-flex justify-content-center gap-3 flex-wrap mb-4">
                     <a href="{{ url_for('add_student') }}" class="btn btn-primary btn-lg px-4">
                         <i class="bi bi-plus-circle"></i> Add Student
                     </a>
                     <a href="{{ url_for('student_list') }}" class="btn btn-outline-primary btn-lg px-4">
                         <i class="bi bi-people"></i> View Students
                     </a>
+                    <a href="{{ url_for('download_apk') }}" class="btn btn-success btn-lg px-4">
+                        <i class="bi bi-android2"></i> Download Android APK
+                    </a>
                 </div>
+
             </div>
         </div>
     </div>

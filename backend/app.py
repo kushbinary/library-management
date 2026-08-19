@@ -11,7 +11,7 @@ Features:
 
 import os
 import datetime
-from flask import Flask, jsonify, request, render_template, flash, redirect, url_for
+from flask import Flask, jsonify, request, render_template, flash, redirect, url_for, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from twilio.rest import Client
@@ -117,11 +117,37 @@ def send_whatsapp_message(student_name, student_phone, message_type='registratio
     return f"Message sent to {student_phone}"
 
 
-# ==================== Routes - Frontend ====================
+# ==================== Routes - Frontend & APK ====================
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/download-apk')
+@app.route('/download/LibraryHubPro.apk')
+def download_apk():
+    static_dir = os.path.join(app.root_path, 'static')
+    for fname in ['LibraryHubPro_v1.0.apk', 'LibraryHubPro.apk', 'MyLibbook_v1.0.apk']:
+        if os.path.exists(os.path.join(static_dir, fname)):
+            return send_from_directory(static_dir, fname, as_attachment=True, download_name='LibraryHubPro_v1.0.apk')
+    parent_dir = os.path.abspath(os.path.join(app.root_path, '..'))
+    for fname in ['LibraryHubPro_v1.0.apk', 'LibraryHubPro.apk', 'MyLibbook_v1.0.apk']:
+        if os.path.exists(os.path.join(parent_dir, fname)):
+            return send_from_directory(parent_dir, fname, as_attachment=True, download_name='LibraryHubPro_v1.0.apk')
+    return "APK not found on server", 404
+
+
+@app.route('/download/MyLibbook.apk')
+def download_mylibbook_apk():
+    static_dir = os.path.join(app.root_path, 'static')
+    if os.path.exists(os.path.join(static_dir, 'MyLibbook_v1.0.apk')):
+        return send_from_directory(static_dir, 'MyLibbook_v1.0.apk', as_attachment=True, download_name='MyLibbook_v1.0.apk')
+    parent_dir = os.path.abspath(os.path.join(app.root_path, '..'))
+    if os.path.exists(os.path.join(parent_dir, 'MyLibbook_v1.0.apk')):
+        return send_from_directory(parent_dir, 'MyLibbook_v1.0.apk', as_attachment=True, download_name='MyLibbook_v1.0.apk')
+    return "APK not found on server", 404
+
 
 
 @app.route('/students')
