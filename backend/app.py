@@ -123,6 +123,22 @@ class Student(db.Model):
 def init_db():
     try:
         db.create_all()
+        # Ensure new columns exist in case of pre-existing tables
+        with db.engine.connect() as conn:
+            migration_statements = [
+                "ALTER TABLE students ADD COLUMN IF NOT EXISTS total_fee FLOAT DEFAULT 1000.0;",
+                "ALTER TABLE students ADD COLUMN IF NOT EXISTS paid_amount FLOAT DEFAULT 1000.0;",
+                "ALTER TABLE students ADD COLUMN IF NOT EXISTS due_amount FLOAT DEFAULT 0.0;",
+                "ALTER TABLE students ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(50) DEFAULT 'UPI';",
+                "ALTER TABLE students ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50) DEFAULT 'Paid';"
+            ]
+            for stmt in migration_statements:
+                try:
+                    conn.execute(db.text(stmt))
+                    conn.commit()
+                except Exception:
+                    pass
+
         # Create default admin account if not already created
         default_admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
         default_admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
@@ -143,18 +159,10 @@ with app.app_context():
 @app.route('/init-db')
 def manual_init_db():
     try:
-        db.create_all()
-        default_admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
-        default_admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
-        existing_admin = AdminUser.query.filter_by(username=default_admin_username).first()
-        if not existing_admin:
-            new_admin = AdminUser(username=default_admin_username)
-            new_admin.set_password(default_admin_password)
-            db.session.add(new_admin)
-            db.session.commit()
+        init_db()
         return jsonify({
             "status": "success",
-            "message": "Database tables created and admin user initialized successfully!"
+            "message": "Database tables and columns created/updated, and admin user initialized successfully!"
         })
     except Exception as e:
         db.session.rollback()
