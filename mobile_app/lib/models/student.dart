@@ -7,6 +7,7 @@ class Student {
   final String timing;
   final String seatNumber;
   final String expiryDate;
+  final double feeAmount;
   final int daysRemaining;
   final bool isExpired;
 
@@ -19,6 +20,7 @@ class Student {
     required this.timing,
     required this.seatNumber,
     required this.expiryDate,
+    this.feeAmount = 800.0,
     this.daysRemaining = 0,
     this.isExpired = false,
   });
@@ -33,6 +35,9 @@ class Student {
       timing: json['timing'] ?? 'Morning',
       seatNumber: json['seat_number'] ?? json['seatNumber'] ?? '',
       expiryDate: json['expiry_date'] ?? json['expiryDate'] ?? '',
+      feeAmount: (json['fee_amount'] ?? json['feeAmount'] ?? 800.0) is num
+          ? (json['fee_amount'] ?? json['feeAmount'] ?? 800.0).toDouble()
+          : double.tryParse(json['fee_amount']?.toString() ?? '800') ?? 800.0,
       daysRemaining: json['days_remaining'] is int
           ? json['days_remaining']
           : int.tryParse(json['days_remaining']?.toString() ?? '0') ?? 0,
@@ -50,6 +55,7 @@ class Student {
       'timing': timing,
       'seat_number': seatNumber,
       'expiry_date': expiryDate,
+      'fee_amount': feeAmount,
     };
   }
 }

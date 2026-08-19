@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/student.dart';
 import '../services/api_service.dart';
 
 class AddStudentScreen extends StatefulWidget {
-  const AddStudentScreen({Key? key}) : super(key: key);
+  const AddStudentScreen({super.key});
 
   @override
   State<AddStudentScreen> createState() => _AddStudentScreenState();
@@ -16,6 +17,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _seatController = TextEditingController();
+  final _feeController = TextEditingController(text: '1000');
 
   DateTime _admissionDate = DateTime.now();
   DateTime _expiryDate = DateTime.now().add(const Duration(days: 30));
@@ -28,7 +30,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
     'Evening (4 PM - 8 PM)',
     'Night (8 PM - 12 AM)',
     'Full Day (8 AM - 8 PM)',
-    '24 Hours',
+    '24 Hours Access',
   ];
 
   Future<void> _pickDate(bool isAdmission) async {
@@ -58,6 +60,10 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
 
     setState(() => _isLoading = true);
 
+    final prefs = await SharedPreferences.getInstance();
+    final currentUser = prefs.getString('current_logged_in_user') ?? 'kushbinary';
+    final fee = double.tryParse(_feeController.text.trim()) ?? 1000.0;
+
     final student = Student(
       name: _nameController.text.trim(),
       email: _emailController.text.trim(),
@@ -66,9 +72,10 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
       timing: _selectedTiming,
       seatNumber: _seatController.text.trim().toUpperCase(),
       expiryDate: DateFormat('yyyy-MM-dd').format(_expiryDate),
+      feeAmount: fee,
     );
 
-    final success = await ApiService.addStudent(student);
+    final success = await ApiService.addStudentForUser(currentUser, student);
 
     setState(() => _isLoading = false);
 
@@ -76,7 +83,13 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Student ${student.name} added successfully! 🎉'),
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 10),
+                Text('Student ${student.name} added (Fee: ₹${fee.toInt()})! 🎉'),
+              ],
+            ),
             backgroundColor: Colors.green.shade700,
           ),
         );
@@ -98,9 +111,10 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add New Student'),
+        title: const Text('Register New Student'),
         backgroundColor: Colors.deepPurple.shade700,
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -112,7 +126,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
               TextFormField(
                 controller: _nameController,
                 decoration: InputDecoration(
-                  labelText: 'Full Name',
+                  labelText: 'Student Full Name',
                   prefixIcon: const Icon(Icons.person_outline),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -151,7 +165,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _selectedTiming,
+                initialValue: _selectedTiming,
                 decoration: InputDecoration(
                   labelText: 'Slot / Timing',
                   prefixIcon: const Icon(Icons.access_time),
@@ -167,19 +181,62 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _seatController,
-                decoration: InputDecoration(
-                  labelText: 'Seat Number (e.g. S-10)',
-                  prefixIcon: const Icon(Icons.chair_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: TextFormField(
+                      controller: _seatController,
+                      decoration: InputDecoration(
+                        labelText: 'Seat No (e.g. S-10)',
+                        prefixIcon: const Icon(Icons.chair_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      validator: (val) =>
+                          val == null || val.isEmpty ? 'Enter seat' : null,
+                    ),
                   ),
-                ),
-                validator: (val) =>
-                    val == null || val.isEmpty ? 'Enter seat number' : null,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 6,
+                    child: TextFormField(
+                      controller: _feeController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Monthly Fee (₹)',
+                        prefixIcon: const Icon(Icons.currency_rupee_rounded),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      validator: (val) =>
+                          val == null || val.isEmpty ? 'Enter fee' : null,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 10),
+              // Quick Fee Suggestion Chips
+              Row(
+                children: [
+                  Text('Quick Fee: ', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                  ...[800, 1000, 1200, 1500].map((amt) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6.0),
+                      child: ActionChip(
+                        label: Text('₹$amt', style: const TextStyle(fontSize: 11)),
+                        padding: EdgeInsets.zero,
+                        onPressed: () {
+                          setState(() => _feeController.text = amt.toString());
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ],
+              ),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
@@ -188,7 +245,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                       icon: const Icon(Icons.calendar_today, size: 18),
                       label: Text(
                         'Join: ${dateFormat.format(_admissionDate)}',
-                        style: const TextStyle(fontSize: 13),
+                        style: const TextStyle(fontSize: 12),
                       ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -205,7 +262,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                       icon: const Icon(Icons.event_busy, size: 18),
                       label: Text(
                         'Expiry: ${dateFormat.format(_expiryDate)}',
-                        style: const TextStyle(fontSize: 13),
+                        style: const TextStyle(fontSize: 12),
                       ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -233,7 +290,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                         )
                       : const Icon(Icons.check_circle_outline),
                   label: Text(
-                    _isLoading ? 'Registering...' : 'Register Student & Send WhatsApp',
+                    _isLoading ? 'Registering...' : 'Register Student & Collect Fee',
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(

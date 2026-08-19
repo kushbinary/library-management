@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/student.dart';
 import '../services/api_service.dart';
 import 'add_student_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -15,20 +17,53 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   String _searchQuery = '';
   String _filter = 'All'; // All, Active, Expiring, Expired
+  String _currentUser = 'kushbinary';
 
   @override
   void initState() {
     super.initState();
-    _loadStudents();
+    _initUserAndLoad();
+  }
+
+  Future<void> _initUserAndLoad() async {
+    final prefs = await SharedPreferences.getInstance();
+    final user = prefs.getString('current_logged_in_user') ?? 'kushbinary';
+    setState(() => _currentUser = user);
+    await _loadStudents();
   }
 
   Future<void> _loadStudents() async {
     setState(() => _isLoading = true);
-    final data = await ApiService.getStudents();
+    final data = await ApiService.getStudentsForUser(_currentUser);
     setState(() {
       _students = data;
       _isLoading = false;
     });
+  }
+
+  // Calculate earnings for the current month
+  double get _thisMonthEarnings {
+    final now = DateTime.now();
+    final currentMonthYear = DateFormat('yyyy-MM').format(now);
+
+    double total = 0;
+    for (var s in _students) {
+      if (s.admissionDate.startsWith(currentMonthYear)) {
+        total += s.feeAmount;
+      }
+    }
+    // If no students in current month yet, calculate from active students
+    if (total == 0 && _students.isNotEmpty) {
+      total = _students.where((s) => !s.isExpired).fold(0, (sum, s) => sum + s.feeAmount);
+    }
+    return total;
+  }
+
+  // Calculate total monthly recurring revenue from active students
+  double get _activeMonthlyRevenue {
+    return _students
+        .where((s) => !s.isExpired)
+        .fold(0, (sum, s) => sum + s.feeAmount);
   }
 
   Future<void> _sendBulkExpiryAlerts() async {
@@ -40,6 +75,37 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: Colors.indigo.shade700,
         ),
       );
+    }
+  }
+
+  Future<void> _deleteStudent(Student student) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Student?'),
+        content: Text('Kya aap ${student.name} ko database se hatana chahte hain?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && student.id != null) {
+      await ApiService.deleteStudentForUser(_currentUser, student.id!);
+      _loadStudents();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${student.name} deleted successfully.')),
+        );
+      }
     }
   }
 
@@ -62,15 +128,22 @@ class _HomeScreenState extends State<HomeScreen> {
     final totalCount = _students.length;
     final activeCount = _students.where((s) => !s.isExpired).length;
     final expiredCount = _students.where((s) => s.isExpired).length;
+    final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Row(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.local_library_rounded),
-            SizedBox(width: 10),
-            Text('Library Management', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Library Management',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            Text(
+              'User: $_currentUser',
+              style: const TextStyle(fontSize: 12, color: Colors.white70),
+            ),
           ],
         ),
         backgroundColor: Colors.deepPurple.shade700,
@@ -90,40 +163,130 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             tooltip: 'Logout',
             icon: const Icon(Icons.logout_rounded),
-            onPressed: () {
-              Navigator.pushReplacementNamed(context, '/');
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove('current_logged_in_user');
+              if (context.mounted) {
+                Navigator.pushReplacementNamed(context, '/');
+              }
             },
           ),
         ],
       ),
       body: Column(
         children: [
-          // Header Stats
+          // EARNINGS & REVENUE CARD (HEADER)
           Container(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
             decoration: BoxDecoration(
-              color: Colors.deepPurple.shade700,
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.deepPurple.shade700,
+                  Colors.indigo.shade800,
+                ],
+              ),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.deepPurple.withValues(alpha: 0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            child: Row(
+            child: Column(
               children: [
-                _buildStatBadge('Total', totalCount.toString(), Colors.white24, Colors.white),
-                const SizedBox(width: 8),
-                _buildStatBadge('Active', activeCount.toString(), Colors.green.withOpacity(0.3), Colors.greenAccent),
-                const SizedBox(width: 8),
-                _buildStatBadge('Expired', expiredCount.toString(), Colors.red.withOpacity(0.3), Colors.redAccent.shade100),
+                // Revenue Stat Cards Row
+                Row(
+                  children: [
+                    // This Month Earnings
+                    Expanded(
+                      flex: 6,
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.greenAccent.withValues(alpha: 0.25),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.account_balance_wallet_rounded,
+                                    color: Colors.greenAccent,
+                                    size: 18,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'This Month Earnings',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              currencyFormat.format(_thisMonthEarnings),
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Active Revenue: ${currencyFormat.format(_activeMonthlyRevenue)}/mo',
+                              style: const TextStyle(color: Colors.white60, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    // Quick Stats Column
+                    Expanded(
+                      flex: 4,
+                      child: Column(
+                        children: [
+                          _buildMiniStat('Total Students', totalCount.toString(), Colors.white),
+                          const SizedBox(height: 6),
+                          _buildMiniStat('Active Seats', activeCount.toString(), Colors.greenAccent),
+                          const SizedBox(height: 6),
+                          _buildMiniStat('Expired', expiredCount.toString(), Colors.redAccent.shade100),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-          // Search & Filter
+
+          // Search & Filters
           Padding(
-            padding: const EdgeInsets.all(14.0),
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
             child: Column(
               children: [
                 TextField(
                   onChanged: (val) => setState(() => _searchQuery = val),
                   decoration: InputDecoration(
-                    hintText: 'Search by name, seat, or phone...',
+                    hintText: 'Search by name, seat, phone...',
                     prefixIcon: const Icon(Icons.search),
                     filled: true,
                     fillColor: Colors.white,
@@ -138,7 +301,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -164,6 +327,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
+
           // Students List
           Expanded(
             child: _isLoading
@@ -173,11 +337,18 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.person_off_outlined, size: 60, color: Colors.grey.shade400),
+                            Icon(Icons.people_outline_rounded, size: 56, color: Colors.grey.shade400),
                             const SizedBox(height: 12),
                             Text(
-                              'No students found',
-                              style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+                              _searchQuery.isNotEmpty
+                                  ? 'No matching students found'
+                                  : 'No students registered for $_currentUser yet.',
+                              style: TextStyle(color: Colors.grey.shade700, fontSize: 15),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Click "+ Add Student" to register and track fees!',
+                              style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
                             ),
                           ],
                         ),
@@ -197,6 +368,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 padding: const EdgeInsets.all(14),
                                 child: Row(
                                   children: [
+                                    // Seat Avatar Badge
                                     CircleAvatar(
                                       radius: 26,
                                       backgroundColor: s.isExpired
@@ -206,6 +378,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         s.seatNumber.isNotEmpty ? s.seatNumber : '?',
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
+                                          fontSize: 14,
                                           color: s.isExpired
                                               ? Colors.red.shade800
                                               : Colors.deepPurple.shade800,
@@ -213,16 +386,41 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                     ),
                                     const SizedBox(width: 14),
+                                    // Student Info
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            s.name,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                            ),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  s.name,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16,
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              // Monthly Fee Badge
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.deepPurple.shade50,
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(color: Colors.deepPurple.shade200),
+                                                ),
+                                                child: Text(
+                                                  '₹${s.feeAmount.toInt()}/mo',
+                                                  style: TextStyle(
+                                                    color: Colors.deepPurple.shade800,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                           const SizedBox(height: 4),
                                           Row(
@@ -252,6 +450,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ],
                                       ),
                                     ),
+                                    const SizedBox(width: 8),
+                                    // Status & Actions
                                     Column(
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
@@ -282,19 +482,32 @@ class _HomeScreenState extends State<HomeScreen> {
                                           ),
                                         ),
                                         const SizedBox(height: 6),
-                                        IconButton(
-                                          icon: const Icon(Icons.chat, color: Colors.green),
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(),
-                                          tooltip: 'WhatsApp Reminder',
-                                          onPressed: () {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                content: Text('WhatsApp reminder sent to ${s.name} (${s.phone})!'),
-                                                backgroundColor: Colors.green.shade700,
-                                              ),
-                                            );
-                                          },
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(Icons.chat, color: Colors.green, size: 20),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                              tooltip: 'WhatsApp Reminder',
+                                              onPressed: () {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text('WhatsApp reminder sent to ${s.name} (${s.phone})!'),
+                                                    backgroundColor: Colors.green.shade700,
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                            const SizedBox(width: 8),
+                                            IconButton(
+                                              icon: Icon(Icons.delete_outline, color: Colors.red.shade400, size: 20),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                              tooltip: 'Delete Student',
+                                              onPressed: () => _deleteStudent(s),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
@@ -324,26 +537,22 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStatBadge(String label, String value, Color bg, Color textCol) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textCol),
-            ),
-            Text(
-              label,
-              style: TextStyle(fontSize: 12, color: textCol.withOpacity(0.9)),
-            ),
-          ],
-        ),
+  Widget _buildMiniStat(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          Text(
+            value,
+            style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 13),
+          ),
+        ],
       ),
     );
   }

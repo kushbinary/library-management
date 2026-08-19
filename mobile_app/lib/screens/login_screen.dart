@@ -129,6 +129,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_registeredAccounts.containsKey(username) &&
         _registeredAccounts[username] == password) {
       _failedAttempts = 0;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('current_logged_in_user', username);
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
