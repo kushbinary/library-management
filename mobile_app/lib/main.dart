@@ -31,6 +31,12 @@ class LibraryApp extends StatelessWidget {
             colorSchemeSeed: const Color(0xFF4338CA),
             scaffoldBackgroundColor: const Color(0xFFF8FAFC),
             fontFamily: 'Roboto',
+            textTheme: const TextTheme(
+              bodyLarge: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w700, fontSize: 16),
+              bodyMedium: TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.w600, fontSize: 14),
+              titleMedium: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w900, fontSize: 16),
+              titleSmall: TextStyle(color: Color(0xFF1E1B4B), fontWeight: FontWeight.w800),
+            ),
             appBarTheme: const AppBarTheme(
               backgroundColor: Color(0xFF4338CA),
               foregroundColor: Colors.white,
@@ -54,18 +60,24 @@ class LibraryApp extends StatelessWidget {
             ),
             inputDecorationTheme: InputDecorationTheme(
               filled: true,
-              fillColor: const Color(0xFFF8FAFC),
+              fillColor: Colors.white,
+              labelStyle: const TextStyle(color: Color(0xFF1E1B4B), fontWeight: FontWeight.w800, fontSize: 14),
+              floatingLabelStyle: const TextStyle(color: Color(0xFF4338CA), fontWeight: FontWeight.w900, fontSize: 14),
+              hintStyle: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500, fontSize: 13),
+              prefixIconColor: const Color(0xFF4338CA),
+              suffixIconColor: const Color(0xFF4338CA),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: Colors.grey.shade300),
+                borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.6),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: Colors.grey.shade300),
+                borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.6),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Color(0xFF4338CA), width: 2),
+                borderSide: const BorderSide(color: Color(0xFF4338CA), width: 2.2),
               ),
             ),
           ),
@@ -75,6 +87,12 @@ class LibraryApp extends StatelessWidget {
             colorSchemeSeed: const Color(0xFF6366F1),
             scaffoldBackgroundColor: const Color(0xFF0F172A),
             fontFamily: 'Roboto',
+            textTheme: const TextTheme(
+              bodyLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16),
+              bodyMedium: TextStyle(color: Color(0xFFF1F5F9), fontWeight: FontWeight.w600, fontSize: 14),
+              titleMedium: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
+              titleSmall: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+            ),
             appBarTheme: const AppBarTheme(
               backgroundColor: Color(0xFF1E1B4B),
               foregroundColor: Colors.white,
@@ -98,17 +116,23 @@ class LibraryApp extends StatelessWidget {
             inputDecorationTheme: InputDecorationTheme(
               filled: true,
               fillColor: const Color(0xFF1E293B),
+              labelStyle: const TextStyle(color: Color(0xFFE2E8F0), fontWeight: FontWeight.w800, fontSize: 14),
+              floatingLabelStyle: const TextStyle(color: Color(0xFF818CF8), fontWeight: FontWeight.w900, fontSize: 14),
+              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w500, fontSize: 13),
+              prefixIconColor: const Color(0xFF818CF8),
+              suffixIconColor: const Color(0xFF818CF8),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Color(0xFF334155)),
+                borderSide: const BorderSide(color: Color(0xFF475569), width: 1.6),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Color(0xFF334155)),
+                borderSide: const BorderSide(color: Color(0xFF475569), width: 1.6),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Color(0xFF818CF8), width: 2),
+                borderSide: const BorderSide(color: Color(0xFF818CF8), width: 2.2),
               ),
             ),
           ),

@@ -1407,19 +1407,46 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
               TextField(
                 onChanged: (val) => setState(() => _searchQuery = val),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF0F172A),
+                ),
                 decoration: InputDecoration(
                   hintText: 'Search by student name, seat, mobile...',
-                  prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF4338CA)),
+                  hintStyle: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    size: 20,
+                    color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF818CF8) : const Color(0xFF4338CA),
+                  ),
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.white,
                   contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
+                    borderSide: BorderSide(
+                      color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                      width: 1.5,
+                    ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
+                    borderSide: BorderSide(
+                      color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                      width: 1.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF818CF8) : const Color(0xFF4338CA),
+                      width: 2.2,
+                    ),
                   ),
                 ),
               ),

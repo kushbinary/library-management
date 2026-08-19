@@ -105,10 +105,22 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Apni UPI ID enter karein jisme fees receive karni hai:', style: TextStyle(fontSize: 12, color: Colors.black87)),
+            Text(
+              'Apni UPI ID enter karein jisme fees receive karni hai:',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+              ),
+            ),
             const SizedBox(height: 12),
             TextField(
               controller: upiCtrl,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF0F172A),
+              ),
               decoration: InputDecoration(
                 labelText: 'UPI ID (VPA)',
                 hintText: 'e.g. 9838127461@paytm, user@okaxis',
@@ -119,6 +131,11 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: nameCtrl,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF0F172A),
+              ),
               decoration: InputDecoration(
                 labelText: 'Library / Business Name',
                 hintText: 'e.g. Kush Library',
@@ -328,15 +345,21 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd MMM yyyy');
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inputTextStyle = TextStyle(
+      fontSize: 15,
+      fontWeight: FontWeight.w700,
+      color: isDark ? Colors.white : const Color(0xFF0F172A),
+    );
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text(
           'Add New Student',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
-        backgroundColor: const Color(0xFF4338CA),
+        backgroundColor: isDark ? const Color(0xFF1E1B4B) : const Color(0xFF4338CA),
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
@@ -358,14 +381,17 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
               _buildSectionCard(
                 title: 'Student Details',
                 icon: Icons.person_outline_rounded,
+                isDark: isDark,
                 child: Column(
                   children: [
                     TextFormField(
                       controller: _nameController,
+                      style: inputTextStyle,
                       decoration: _inputDecoration(
                         label: 'Student Full Name *',
                         hint: 'e.g. Rahul Sharma',
                         icon: Icons.person_rounded,
+                        isDark: isDark,
                       ),
                       validator: (value) =>
                           value == null || value.trim().isEmpty ? 'Please enter student name' : null,
@@ -374,10 +400,12 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                     TextFormField(
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
+                      style: inputTextStyle,
                       decoration: _inputDecoration(
                         label: 'Mobile Number (WhatsApp) *',
                         hint: 'e.g. 9838127461',
                         icon: Icons.phone_android_rounded,
+                        isDark: isDark,
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) return 'Please enter mobile number';
@@ -394,15 +422,18 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
               _buildSectionCard(
                 title: 'Seat & Slot Timing',
                 icon: Icons.chair_alt_rounded,
+                isDark: isDark,
                 child: Column(
                   children: [
                     TextFormField(
                       controller: _seatController,
+                      style: inputTextStyle,
                       textCapitalization: TextCapitalization.characters,
                       decoration: _inputDecoration(
                         label: 'Seat Number *',
                         hint: 'e.g. 05, A-12, B-04',
                         icon: Icons.event_seat_rounded,
+                        isDark: isDark,
                       ),
                       validator: (value) =>
                           value == null || value.trim().isEmpty ? 'Please assign a seat number' : null,
@@ -410,12 +441,18 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
                       initialValue: _selectedTiming,
+                      style: inputTextStyle,
+                      dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                       decoration: _inputDecoration(
                         label: 'Shift / Timing Slot',
                         icon: Icons.access_time_rounded,
+                        isDark: isDark,
                       ),
                       items: _timingOptions.map((opt) {
-                        return DropdownMenuItem(value: opt, child: Text(opt, style: const TextStyle(fontSize: 13)));
+                        return DropdownMenuItem(
+                          value: opt,
+                          child: Text(opt, style: inputTextStyle.copyWith(fontSize: 13)),
+                        );
                       }).toList(),
                       onChanged: (val) {
                         if (val != null) setState(() => _selectedTiming = val);
@@ -430,24 +467,46 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
               _buildSectionCard(
                 title: 'Fees & Payment Collection',
                 icon: Icons.payments_outlined,
+                isDark: isDark,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Quick Preset Fee Chips
-                    const Text(
+                    Text(
                       'Quick Fee Preset (फीस चुनें):',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                      ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [800, 1000, 1200, 1500].map((amt) {
+                          final isSelected = _totalFeeController.text == amt.toString();
                           return Padding(
-                            padding: const EdgeInsets.only(right: 6.0),
+                            padding: const EdgeInsets.only(right: 8.0),
                             child: ActionChip(
-                              label: Text('₹$amt', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                              backgroundColor: _totalFeeController.text == amt.toString() ? const Color(0xFFE0E7FF) : Colors.grey.shade100,
+                              label: Text(
+                                '₹$amt',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : (isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E1B4B)),
+                                ),
+                              ),
+                              backgroundColor: isSelected
+                                  ? const Color(0xFF4338CA)
+                                  : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                              side: BorderSide(
+                                color: isSelected
+                                    ? const Color(0xFF6366F1)
+                                    : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                              ),
                               onPressed: () {
                                 setState(() {
                                   _totalFeeController.text = amt.toString();
@@ -459,7 +518,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                         }).toList(),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
 
                     // Total Fee & Paid Amount Inputs
                     Row(
@@ -467,10 +526,12 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                         Expanded(
                           child: TextFormField(
                             controller: _totalFeeController,
+                            style: inputTextStyle,
                             keyboardType: TextInputType.number,
                             decoration: _inputDecoration(
                               label: 'Total Fee (कुल ₹) *',
                               icon: Icons.currency_rupee_rounded,
+                              isDark: isDark,
                             ),
                             onChanged: (_) => setState(() {}),
                             validator: (v) => (double.tryParse(v ?? '') ?? 0) <= 0 ? 'Enter valid fee' : null,
@@ -480,42 +541,54 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                         Expanded(
                           child: TextFormField(
                             controller: _paidAmountController,
+                            style: inputTextStyle,
                             keyboardType: TextInputType.number,
                             decoration: _inputDecoration(
                               label: 'Paid (जमा राशि ₹) *',
                               icon: Icons.check_circle_outline_rounded,
+                              isDark: isDark,
                             ),
                             onChanged: (_) => setState(() {}),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
 
                     // Payment Mode Dropdown
                     DropdownButtonFormField<String>(
                       initialValue: _selectedPaymentMode,
+                      style: inputTextStyle,
+                      dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                       decoration: _inputDecoration(
                         label: 'Payment Mode (माध्यम)',
                         icon: Icons.account_balance_wallet_rounded,
+                        isDark: isDark,
                       ),
                       items: _paymentModes.map((mode) {
-                        return DropdownMenuItem(value: mode, child: Text(mode, style: const TextStyle(fontSize: 13)));
+                        return DropdownMenuItem(
+                          value: mode,
+                          child: Text(mode, style: inputTextStyle.copyWith(fontSize: 13)),
+                        );
                       }).toList(),
                       onChanged: (val) {
                         if (val != null) setState(() => _selectedPaymentMode = val);
                       },
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
 
                     // Live Due & Payment Status Box
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: _dueAmount > 0 ? Colors.amber.shade50 : Colors.green.shade50,
+                        color: _dueAmount > 0
+                            ? (isDark ? const Color(0xFF451A03) : Colors.amber.shade50)
+                            : (isDark ? const Color(0xFF064E3B) : Colors.green.shade50),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: _dueAmount > 0 ? Colors.amber.shade300 : Colors.green.shade300,
+                          color: _dueAmount > 0
+                              ? (isDark ? Colors.amber.shade700 : Colors.amber.shade400)
+                              : (isDark ? Colors.green.shade700 : Colors.green.shade400),
                         ),
                       ),
                       child: Row(
@@ -529,7 +602,9 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: _dueAmount > 0 ? Colors.amber.shade900 : Colors.green.shade900,
+                                  color: _dueAmount > 0
+                                      ? (isDark ? Colors.amber.shade200 : Colors.amber.shade900)
+                                      : (isDark ? Colors.green.shade200 : Colors.green.shade900),
                                 ),
                               ),
                               Text(
@@ -537,7 +612,9 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w900,
-                                  color: _dueAmount > 0 ? Colors.amber.shade900 : Colors.green.shade900,
+                                  color: _dueAmount > 0
+                                      ? (isDark ? Colors.amber.shade200 : Colors.amber.shade900)
+                                      : (isDark ? Colors.green.shade200 : Colors.green.shade900),
                                 ),
                               ),
                             ],
@@ -571,6 +648,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
               _buildSectionCard(
                 title: 'Membership Validity',
                 icon: Icons.calendar_month_outlined,
+                isDark: isDark,
                 child: Row(
                   children: [
                     Expanded(
@@ -580,16 +658,30 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade300),
+                            border: Border.all(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
                             borderRadius: BorderRadius.circular(12),
-                            color: Colors.white,
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Admission Date', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                              Text(
+                                'Admission Date',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                ),
+                              ),
                               const SizedBox(height: 4),
-                              Text(dateFormat.format(_admissionDate), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              Text(
+                                dateFormat.format(_admissionDate),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -603,16 +695,30 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade300),
+                            border: Border.all(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
                             borderRadius: BorderRadius.circular(12),
-                            color: Colors.white,
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Expiry Date', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                              Text(
+                                'Expiry Date',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                ),
+                              ),
                               const SizedBox(height: 4),
-                              Text(dateFormat.format(_expiryDate), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              Text(
+                                dateFormat.format(_expiryDate),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -659,31 +765,40 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
     required String title,
     required IconData icon,
     required Widget child,
+    bool isDark = false,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 3)),
+          BoxShadow(
+            color: isDark ? Colors.black.withValues(alpha: 0.3) : Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
         ],
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: const Color(0xFF4338CA), size: 20),
+              Icon(icon, color: isDark ? const Color(0xFF818CF8) : const Color(0xFF4338CA), size: 20),
               const SizedBox(width: 8),
               Text(
                 title,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF1E1B4B)),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
               ),
             ],
           ),
-          const Divider(height: 20),
+          Divider(height: 20, color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
           child,
         ],
       ),
@@ -694,25 +809,35 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
     required String label,
     String? hint,
     required IconData icon,
+    bool isDark = false,
   }) {
+    final primaryColor = isDark ? const Color(0xFF818CF8) : const Color(0xFF4338CA);
+    final fillBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9);
+    final borderColor = isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1);
+    final labelColor = isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E1B4B);
+    final hintColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
     return InputDecoration(
       labelText: label,
       hintText: hint,
-      prefixIcon: Icon(icon, color: const Color(0xFF4338CA), size: 18),
+      labelStyle: TextStyle(color: labelColor, fontWeight: FontWeight.w800, fontSize: 14),
+      floatingLabelStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w900, fontSize: 14),
+      hintStyle: TextStyle(color: hintColor, fontWeight: FontWeight.w500, fontSize: 13),
+      prefixIcon: Icon(icon, color: primaryColor, size: 20),
       filled: true,
-      fillColor: const Color(0xFFF8FAFC),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      fillColor: fillBg,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: borderColor, width: 1.6),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: borderColor, width: 1.6),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF4338CA), width: 1.8),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: primaryColor, width: 2.2),
       ),
     );
   }
