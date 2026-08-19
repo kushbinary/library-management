@@ -20,8 +20,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   String _currentUser = 'kushbinary';
   late TabController _tabController;
 
-  // Library Total Seat Capacity Configuration
-  static const int totalLibrarySeats = 40; // Total 40 seats (A01 - D10)
+  static const int totalLibrarySeats = 40;
+
+  final List<String> _timingOptions = [
+    'Morning (8 AM - 12 PM)',
+    'Afternoon (12 PM - 4 PM)',
+    'Evening (4 PM - 8 PM)',
+    'Night (8 PM - 12 AM)',
+    'Full Day (8 AM - 8 PM)',
+    '24 Hours Access',
+  ];
 
   @override
   void initState() {
@@ -52,7 +60,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     });
   }
 
-  // Generate standard library seat IDs: A01..A10, B01..B10, C01..C10, D01..D10
   List<String> get _allSeatNumbers {
     final rows = ['A', 'B', 'C', 'D'];
     final seats = <String>[];
@@ -64,7 +71,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return seats;
   }
 
-  // Get occupied seats map (seatNumber -> Student)
   Map<String, Student> get _occupiedSeatsMap {
     final map = <String, Student>{};
     for (var s in _students) {
@@ -78,7 +84,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   int get _occupiedCount => _students.where((s) => !s.isExpired).length;
   int get _vacantCount => (totalLibrarySeats - _occupiedCount) > 0 ? (totalLibrarySeats - _occupiedCount) : 0;
 
-  // Calculate earnings for the current month
   double get _thisMonthCollectedEarnings {
     final now = DateTime.now();
     final currentMonthYear = DateFormat('yyyy-MM').format(now);
@@ -140,6 +145,329 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         );
       }
     }
+  }
+
+  // ================= SMART EDIT & COLLECT DUE FEE MODAL =================
+  void _showEditStudentModal(Student s) {
+    final nameCtrl = TextEditingController(text: s.name);
+    final phoneCtrl = TextEditingController(text: s.phone);
+    final seatCtrl = TextEditingController(text: s.seatNumber);
+    final totalFeeCtrl = TextEditingController(text: s.totalFee.toInt().toString());
+    final paidAmountCtrl = TextEditingController(text: s.paidAmount.toInt().toString());
+    final additionalPaidCtrl = TextEditingController();
+
+    String selectedTiming = s.timing;
+    DateTime expiryDate = DateTime.tryParse(s.expiryDate) ?? DateTime.now().add(const Duration(days: 30));
+    final dateFormat = DateFormat('yyyy-MM-dd');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          final double curTot = double.tryParse(totalFeeCtrl.text) ?? s.totalFee;
+          final double curPaid = double.tryParse(paidAmountCtrl.text) ?? s.paidAmount;
+          final double curDue = (curTot - curPaid) > 0 ? (curTot - curPaid) : 0.0;
+
+          return Container(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              top: 20,
+              left: 20,
+              right: 20,
+            ),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE0E7FF),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.edit_note_rounded, color: Color(0xFF4338CA), size: 22),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Edit & Collect Fee', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+                              Text('Student: ${s.name} • Seat ${s.seatNumber}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                            ],
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 20),
+
+                  // 1. Fee Collection / Due Box
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: curDue > 0 ? Colors.amber.shade50 : Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: curDue > 0 ? Colors.amber.shade300 : Colors.green.shade300),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            Column(
+                              children: [
+                                const Text('Total Fee', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                                Text('₹${curTot.toInt()}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                            Container(width: 1, height: 26, color: Colors.grey.shade400),
+                            Column(
+                              children: [
+                                const Text('Paid (जमा)', style: TextStyle(fontSize: 11, color: Colors.green)),
+                                Text('₹${curPaid.toInt()}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green.shade800)),
+                              ],
+                            ),
+                            Container(width: 1, height: 26, color: Colors.grey.shade400),
+                            Column(
+                              children: [
+                                const Text('Due (बकाया)', style: TextStyle(fontSize: 11, color: Colors.red)),
+                                Text('₹${curDue.toInt()}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: curDue > 0 ? Colors.red.shade800 : Colors.green.shade800)),
+                              ],
+                            ),
+                          ],
+                        ),
+                        if (curDue > 0) ...[
+                          const SizedBox(height: 10),
+                          // Quick 1-Tap "Pay Full Due" Button
+                          SizedBox(
+                            width: double.infinity,
+                            height: 36,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.amber.shade700,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: () {
+                                setModalState(() {
+                                  paidAmountCtrl.text = curTot.toInt().toString();
+                                  additionalPaidCtrl.text = curDue.toInt().toString();
+                                });
+                              },
+                              icon: const Icon(Icons.flash_on_rounded, size: 16),
+                              label: Text('1-Tap: Collect Remaining ₹${curDue.toInt()} (पूरा जमा)', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 2. Add New Payment Input
+                  TextField(
+                    controller: additionalPaidCtrl,
+                    keyboardType: TextInputType.number,
+                    onChanged: (val) {
+                      final addAmt = double.tryParse(val.trim()) ?? 0.0;
+                      setModalState(() {
+                        final newPaid = s.paidAmount + addAmt;
+                        paidAmountCtrl.text = (newPaid > curTot ? curTot : newPaid).toInt().toString();
+                      });
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Collect Extra Payment Now (अतिरिक्त जमा राशि ₹)',
+                      hintText: 'e.g. 200',
+                      prefixIcon: const Icon(Icons.add_card_rounded, color: Colors.teal),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 3. Edit Student Details Fields
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: nameCtrl,
+                          decoration: InputDecoration(
+                            labelText: 'Student Name',
+                            prefixIcon: const Icon(Icons.person_rounded, size: 18),
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: phoneCtrl,
+                          keyboardType: TextInputType.phone,
+                          decoration: InputDecoration(
+                            labelText: 'WhatsApp Mobile',
+                            prefixIcon: const Icon(Icons.phone_android, size: 18),
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 4,
+                        child: TextField(
+                          controller: seatCtrl,
+                          textCapitalization: TextCapitalization.characters,
+                          decoration: InputDecoration(
+                            labelText: 'Seat No',
+                            prefixIcon: const Icon(Icons.event_seat, size: 18),
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 6,
+                        child: DropdownButtonFormField<String>(
+                          initialValue: _timingOptions.contains(selectedTiming) ? selectedTiming : _timingOptions.first,
+                          decoration: InputDecoration(
+                            labelText: 'Slot Timing',
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          items: _timingOptions.map((opt) {
+                            return DropdownMenuItem(value: opt, child: Text(opt, style: const TextStyle(fontSize: 12)));
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setModalState(() => selectedTiming = val);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 4. Extend Validity Button
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: expiryDate,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2030),
+                            );
+                            if (picked != null) {
+                              setModalState(() => expiryDate = picked);
+                            }
+                          },
+                          icon: const Icon(Icons.calendar_month_rounded, size: 16),
+                          label: Text('Expiry: ${dateFormat.format(expiryDate)}', style: const TextStyle(fontSize: 12)),
+                          style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ActionChip(
+                        label: const Text('+30 Days', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                        backgroundColor: Colors.indigo.shade50,
+                        onPressed: () {
+                          setModalState(() {
+                            expiryDate = expiryDate.add(const Duration(days: 30));
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Save & Update Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4338CA),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: () async {
+                        final finalTot = double.tryParse(totalFeeCtrl.text) ?? s.totalFee;
+                        final finalPaid = double.tryParse(paidAmountCtrl.text) ?? s.paidAmount;
+                        final finalDue = (finalTot - finalPaid) > 0 ? (finalTot - finalPaid) : 0.0;
+                        String st = 'Paid';
+                        if (finalPaid <= 0) st = 'Due';
+                        else if (finalDue > 0) st = 'Partial';
+
+                        final updatedStudent = Student(
+                          id: s.id,
+                          name: nameCtrl.text.trim(),
+                          phone: phoneCtrl.text.trim(),
+                          admissionDate: s.admissionDate,
+                          timing: selectedTiming,
+                          seatNumber: seatCtrl.text.trim().toUpperCase(),
+                          expiryDate: dateFormat.format(expiryDate),
+                          totalFee: finalTot,
+                          paidAmount: finalPaid,
+                          dueAmount: finalDue,
+                          paymentMode: s.paymentMode,
+                          paymentStatus: st,
+                        );
+
+                        await ApiService.updateStudentForUser(_currentUser, updatedStudent);
+                        Navigator.pop(ctx);
+                        _loadStudents();
+
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('✅ ${updatedStudent.name} updated! (Paid: ₹${finalPaid.toInt()}, Due: ₹${finalDue.toInt()})'),
+                              backgroundColor: Colors.green.shade700,
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.save_rounded, size: 20),
+                      label: const Text('Save & Update Student Record', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   List<Student> get _filteredStudents {
@@ -226,10 +554,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       body: TabBarView(
         controller: _tabController,
         children: [
-          // TAB 1: STUDENTS LIST & REVENUE OVERVIEW
           _buildStudentsTab(currencyFormat),
-
-          // TAB 2: LIVE SEAT MATRIX (KHALLI / BHARI SEATS)
           _buildSeatMapTab(),
         ],
       ),
@@ -442,7 +767,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ),
 
-        // 3. Students List with Highlighted Names
+        // 3. Students List with Highlighted Names & Edit Option
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
@@ -488,7 +813,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               padding: const EdgeInsets.all(12),
                               child: Row(
                                 children: [
-                                  // Seat Badge with glowing indicator
+                                  // Seat Badge
                                   Container(
                                     width: 52,
                                     height: 52,
@@ -534,7 +859,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        // Highlighted Name & Fees
                                         Row(
                                           children: [
                                             Expanded(
@@ -574,7 +898,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                         ),
                                         const SizedBox(height: 4),
 
-                                        // Mobile & Payment Mode
                                         Row(
                                           children: [
                                             Icon(Icons.phone_android_rounded, size: 13, color: Colors.indigo.shade600),
@@ -594,7 +917,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                         ),
                                         const SizedBox(height: 2),
 
-                                        // Timing & Validity
                                         Row(
                                           children: [
                                             Icon(Icons.access_time_filled_rounded, size: 13, color: Colors.grey.shade600),
@@ -613,7 +935,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   ),
                                   const SizedBox(width: 6),
 
-                                  // Actions Column
+                                  // Actions Column with EDIT Button
                                   Column(
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
@@ -639,6 +961,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                       Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
+                                          // EDIT & COLLECT FEE BUTTON
+                                          IconButton(
+                                            icon: const Icon(Icons.edit_note_rounded, color: Color(0xFF4338CA), size: 23),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(),
+                                            tooltip: 'Edit & Collect Fee',
+                                            onPressed: () => _showEditStudentModal(s),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          // WHATSAPP REMINDER
                                           IconButton(
                                             icon: const Icon(Icons.chat_rounded, color: Colors.green, size: 20),
                                             padding: EdgeInsets.zero,
@@ -653,7 +985,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                               );
                                             },
                                           ),
-                                          const SizedBox(width: 10),
+                                          const SizedBox(width: 8),
+                                          // DELETE
                                           IconButton(
                                             icon: Icon(Icons.delete_outline_rounded, color: Colors.red.shade400, size: 20),
                                             padding: EdgeInsets.zero,
@@ -677,7 +1010,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  // ================= TAB 2: LIVE SEAT MATRIX (SEAT MAP) =================
+  // ================= TAB 2: LIVE SEAT MATRIX =================
   Widget _buildSeatMapTab() {
     final seatMap = _occupiedSeatsMap;
     final allSeats = _allSeatNumbers;
@@ -687,7 +1020,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Seat Legend Banner
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -708,7 +1040,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           const SizedBox(height: 14),
 
-          // 2. Room Overview Info
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -724,7 +1055,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           const SizedBox(height: 10),
 
-          // 3. Grid of Seats
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -821,7 +1151,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  // Dialog when clicking an occupied seat
   void _showSeatStudentDetails(String seatNo, Student student) {
     showModalBottomSheet(
       context: context,
@@ -862,19 +1191,33 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             const SizedBox(height: 6),
             Text('Expires on: ${student.expiryDate} (${student.daysRemaining} days left)', style: TextStyle(color: student.isExpired ? Colors.red : Colors.grey.shade700)),
             const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('WhatsApp message sent to ${student.name}!'), backgroundColor: Colors.green),
-                  );
-                },
-                icon: const Icon(Icons.chat_rounded),
-                label: const Text('Send WhatsApp Notification'),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _showEditStudentModal(student);
+                    },
+                    icon: const Icon(Icons.edit_note_rounded, size: 18),
+                    label: const Text('Edit / Collect Fee'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('WhatsApp message sent to ${student.name}!'), backgroundColor: Colors.green),
+                      );
+                    },
+                    icon: const Icon(Icons.chat_rounded, size: 18),
+                    label: const Text('WhatsApp'),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -882,7 +1225,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  // Dialog when clicking an empty/khali seat
   void _showBookSeatDialog(String seatNo) {
     showDialog(
       context: context,

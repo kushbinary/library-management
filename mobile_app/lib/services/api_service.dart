@@ -150,6 +150,17 @@ class ApiService {
     return await saveStudentsForUser(username, list);
   }
 
+  // Update existing student (e.g. collecting due fee, changing seat, extending validity)
+  static Future<bool> updateStudentForUser(String username, Student student) async {
+    final list = await getStudentsForUser(username);
+    final index = list.indexWhere((s) => s.id == student.id);
+    if (index != -1) {
+      list[index] = student;
+      return await saveStudentsForUser(username, list);
+    }
+    return false;
+  }
+
   static Future<bool> deleteStudentForUser(String username, int id) async {
     final list = await getStudentsForUser(username);
     list.removeWhere((s) => s.id == id);
