@@ -135,6 +135,31 @@ class LibraryApp extends StatelessWidget {
                 borderSide: const BorderSide(color: Color(0xFF818CF8), width: 2.2),
               ),
             ),
+            dialogTheme: DialogThemeData(
+              backgroundColor: const Color(0xFF1E293B),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              titleTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
+              contentTextStyle: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 14),
+            ),
+            bottomSheetTheme: const BottomSheetThemeData(
+              backgroundColor: Color(0xFF1E293B),
+              modalBackgroundColor: Color(0xFF1E293B),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+            ),
+            chipTheme: ChipThemeData(
+              backgroundColor: const Color(0xFF334155),
+              selectedColor: const Color(0xFF312E81),
+              labelStyle: const TextStyle(color: Color(0xFFE2E8F0)),
+              secondaryLabelStyle: const TextStyle(color: Colors.white),
+              side: const BorderSide(color: Color(0xFF475569)),
+            ),
+            listTileTheme: const ListTileThemeData(
+              textColor: Colors.white,
+              iconColor: Color(0xFF818CF8),
+            ),
+            dividerTheme: const DividerThemeData(
+              color: Color(0xFF334155),
+            ),
           ),
           initialRoute: '/',
           routes: {

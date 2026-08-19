@@ -146,9 +146,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             left: 20,
             right: 20,
           ),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -226,9 +226,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   maxLines: 7,
                   decoration: InputDecoration(
                     filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade300)),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade200)),
+                    fillColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF475569) : Colors.grey.shade300)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF475569) : Colors.grey.shade200)),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -376,7 +376,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Apni UPI ID enter karein jisme fees QR code se receive karni hai:', style: TextStyle(fontSize: 12, color: Colors.black87)),
+            const Text('Apni UPI ID enter karein jisme fees QR code se receive karni hai:', style: TextStyle(fontSize: 12)),
             const SizedBox(height: 12),
             TextField(
               controller: upiCtrl,
@@ -666,9 +666,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               left: 20,
               right: 20,
             ),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            decoration: BoxDecoration(
+              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
             ),
             child: SingleChildScrollView(
               child: Column(
@@ -817,7 +817,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         },
                       ),
                       filled: true,
-                      fillColor: const Color(0xFFF8FAFC),
+                      fillColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
@@ -833,7 +833,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             labelText: 'Student Name',
                             prefixIcon: const Icon(Icons.person_rounded, size: 18),
                             filled: true,
-                            fillColor: const Color(0xFFF8FAFC),
+                            fillColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                         ),
@@ -847,7 +847,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             labelText: 'Mobile Number',
                             prefixIcon: const Icon(Icons.phone_android, size: 18),
                             filled: true,
-                            fillColor: const Color(0xFFF8FAFC),
+                            fillColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                         ),
@@ -869,7 +869,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             hintText: 'e.g. 05, A-12',
                             prefixIcon: const Icon(Icons.event_seat, size: 18),
                             filled: true,
-                            fillColor: const Color(0xFFF8FAFC),
+                            fillColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                         ),
@@ -882,7 +882,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           decoration: InputDecoration(
                             labelText: 'Slot Timing',
                             filled: true,
-                            fillColor: const Color(0xFFF8FAFC),
+                            fillColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           items: _timingOptions.map((opt) {
@@ -1014,7 +1014,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Choose Seat Naming Format:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87)),
+                const Text('Choose Seat Naming Format:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: formatType,
