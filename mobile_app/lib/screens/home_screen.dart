@@ -16,7 +16,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Student> _students = [];
   bool _isLoading = true;
   String _searchQuery = '';
-  String _filter = 'All'; // All, Active, Expiring, Expired
+  String _filter = 'All'; // All, Active, Expiring, Expired, Due Fees
   String _currentUser = 'kushbinary';
 
   @override
@@ -41,29 +41,33 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // Calculate earnings for the current month
-  double get _thisMonthEarnings {
+  // Calculate total collected fees for the current month
+  double get _thisMonthCollectedEarnings {
     final now = DateTime.now();
     final currentMonthYear = DateFormat('yyyy-MM').format(now);
 
     double total = 0;
     for (var s in _students) {
       if (s.admissionDate.startsWith(currentMonthYear)) {
-        total += s.feeAmount;
+        total += s.paidAmount;
       }
     }
-    // If no students in current month yet, calculate from active students
     if (total == 0 && _students.isNotEmpty) {
-      total = _students.where((s) => !s.isExpired).fold(0, (sum, s) => sum + s.feeAmount);
+      total = _students.fold(0, (sum, s) => sum + s.paidAmount);
     }
     return total;
   }
 
-  // Calculate total monthly recurring revenue from active students
+  // Calculate total pending/due fees
+  double get _totalDueAmount {
+    return _students.fold(0, (sum, s) => sum + s.dueAmount);
+  }
+
+  // Calculate active monthly revenue
   double get _activeMonthlyRevenue {
     return _students
         .where((s) => !s.isExpired)
-        .fold(0, (sum, s) => sum + s.feeAmount);
+        .fold(0, (sum, s) => sum + s.totalFee);
   }
 
   Future<void> _sendBulkExpiryAlerts() async {
@@ -119,6 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_filter == 'Active') return !s.isExpired && s.daysRemaining > 5;
       if (_filter == 'Expiring') return !s.isExpired && s.daysRemaining <= 5;
       if (_filter == 'Expired') return s.isExpired;
+      if (_filter == 'Due Fees') return s.dueAmount > 0;
       return true;
     }).toList();
   }
@@ -127,21 +132,20 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final totalCount = _students.length;
     final activeCount = _students.where((s) => !s.isExpired).length;
-    final expiredCount = _students.where((s) => s.isExpired).length;
     final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Library Management',
+              'Library Hub',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
             Text(
-              'User: $_currentUser',
+              'Admin: $_currentUser',
               style: const TextStyle(fontSize: 12, color: Colors.white70),
             ),
           ],
@@ -175,7 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
-          // EARNINGS & REVENUE CARD (HEADER)
+          // 1. FINANCIAL DASHBOARD SUMMARY (HEADER)
           Container(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
             decoration: BoxDecoration(
@@ -198,10 +202,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: Column(
               children: [
-                // Revenue Stat Cards Row
                 Row(
                   children: [
-                    // This Month Earnings
+                    // Collected Earnings Card
                     Expanded(
                       flex: 6,
                       child: Container(
@@ -217,7 +220,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(6),
+                                  padding: const EdgeInsets.all(5),
                                   decoration: BoxDecoration(
                                     color: Colors.greenAccent.withValues(alpha: 0.25),
                                     borderRadius: BorderRadius.circular(8),
@@ -225,15 +228,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                   child: const Icon(
                                     Icons.account_balance_wallet_rounded,
                                     color: Colors.greenAccent,
-                                    size: 18,
+                                    size: 16,
                                   ),
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 6),
                                 const Text(
-                                  'This Month Earnings',
+                                  'This Month Collected',
                                   style: TextStyle(
                                     color: Colors.white70,
-                                    fontSize: 12,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -241,9 +244,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              currencyFormat.format(_thisMonthEarnings),
+                              currencyFormat.format(_thisMonthCollectedEarnings),
                               style: const TextStyle(
-                                fontSize: 24,
+                                fontSize: 22,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                                 letterSpacing: 0.5,
@@ -251,7 +254,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Active Revenue: ${currencyFormat.format(_activeMonthlyRevenue)}/mo',
+                              'Active Run-rate: ${currencyFormat.format(_activeMonthlyRevenue)}',
                               style: const TextStyle(color: Colors.white60, fontSize: 11),
                             ),
                           ],
@@ -259,7 +262,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    // Quick Stats Column
+                    // Quick Stats Cards
                     Expanded(
                       flex: 4,
                       child: Column(
@@ -268,7 +271,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           const SizedBox(height: 6),
                           _buildMiniStat('Active Seats', activeCount.toString(), Colors.greenAccent),
                           const SizedBox(height: 6),
-                          _buildMiniStat('Expired', expiredCount.toString(), Colors.redAccent.shade100),
+                          _buildMiniStat('Pending Due', currencyFormat.format(_totalDueAmount), _totalDueAmount > 0 ? Colors.amberAccent : Colors.white70),
                         ],
                       ),
                     ),
@@ -278,16 +281,16 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // Search & Filters
+          // 2. Search & Filter Bar
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
             child: Column(
               children: [
                 TextField(
                   onChanged: (val) => setState(() => _searchQuery = val),
                   decoration: InputDecoration(
-                    hintText: 'Search by name, seat, phone...',
-                    prefixIcon: const Icon(Icons.search),
+                    hintText: 'Search by student name, seat, phone...',
+                    prefixIcon: const Icon(Icons.search, size: 20),
                     filled: true,
                     fillColor: Colors.white,
                     contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
@@ -305,7 +308,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: ['All', 'Active', 'Expiring', 'Expired'].map((f) {
+                    children: ['All', 'Active', 'Due Fees', 'Expiring', 'Expired'].map((f) {
                       final isSelected = _filter == f;
                       return Padding(
                         padding: const EdgeInsets.only(right: 8.0),
@@ -328,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // Students List
+          // 3. Students List
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -347,7 +350,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'Click "+ Add Student" to register and track fees!',
+                              'Click "+ Add Student" to register and collect fees!',
                               style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
                             ),
                           ],
@@ -364,6 +367,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               margin: const EdgeInsets.only(bottom: 12),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                               elevation: 2,
+                              color: Colors.white,
                               child: Padding(
                                 padding: const EdgeInsets.all(14),
                                 child: Row(
@@ -385,7 +389,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 14),
+                                    const SizedBox(width: 12),
                                     // Student Info
                                     Expanded(
                                       child: Column(
@@ -403,18 +407,23 @@ class _HomeScreenState extends State<HomeScreen> {
                                                   overflow: TextOverflow.ellipsis,
                                                 ),
                                               ),
-                                              // Monthly Fee Badge
+                                              // Payment Status Chip
                                               Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.deepPurple.shade50,
+                                                  color: s.dueAmount > 0
+                                                      ? Colors.amber.shade100
+                                                      : Colors.green.shade100,
                                                   borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(color: Colors.deepPurple.shade200),
                                                 ),
                                                 child: Text(
-                                                  '₹${s.feeAmount.toInt()}/mo',
+                                                  s.dueAmount > 0
+                                                      ? 'Due: ₹${s.dueAmount.toInt()}'
+                                                      : 'Paid: ₹${s.paidAmount.toInt()}',
                                                   style: TextStyle(
-                                                    color: Colors.deepPurple.shade800,
+                                                    color: s.dueAmount > 0
+                                                        ? Colors.amber.shade900
+                                                        : Colors.green.shade900,
                                                     fontSize: 11,
                                                     fontWeight: FontWeight.bold,
                                                   ),
@@ -425,8 +434,26 @@ class _HomeScreenState extends State<HomeScreen> {
                                           const SizedBox(height: 4),
                                           Row(
                                             children: [
-                                              Icon(Icons.schedule, size: 14, color: Colors.grey.shade600),
-                                              const SizedBox(width: 4),
+                                              Icon(Icons.phone_android, size: 13, color: Colors.grey.shade600),
+                                              const SizedBox(width: 3),
+                                              Text(
+                                                s.phone,
+                                                style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Icon(Icons.payment, size: 13, color: Colors.grey.shade600),
+                                              const SizedBox(width: 3),
+                                              Text(
+                                                s.paymentMode,
+                                                style: TextStyle(color: Colors.grey.shade700, fontSize: 11),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Row(
+                                            children: [
+                                              Icon(Icons.schedule, size: 13, color: Colors.grey.shade600),
+                                              const SizedBox(width: 3),
                                               Expanded(
                                                 child: Text(
                                                   s.timing,
@@ -436,36 +463,25 @@ class _HomeScreenState extends State<HomeScreen> {
                                               ),
                                             ],
                                           ),
-                                          const SizedBox(height: 2),
-                                          Row(
-                                            children: [
-                                              Icon(Icons.calendar_month, size: 14, color: Colors.grey.shade600),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                'Expires: ${s.expiryDate}',
-                                                style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
-                                              ),
-                                            ],
-                                          ),
                                         ],
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    // Status & Actions
+                                    const SizedBox(width: 6),
+                                    // Validity & Actions
                                     Column(
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                           decoration: BoxDecoration(
                                             color: s.isExpired
                                                 ? Colors.red.shade50
-                                                : Colors.green.shade50,
+                                                : Colors.blue.shade50,
                                             borderRadius: BorderRadius.circular(8),
                                             border: Border.all(
                                               color: s.isExpired
                                                   ? Colors.red.shade300
-                                                  : Colors.green.shade300,
+                                                  : Colors.blue.shade200,
                                             ),
                                           ),
                                           child: Text(
@@ -475,7 +491,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                             style: TextStyle(
                                               color: s.isExpired
                                                   ? Colors.red.shade700
-                                                  : Colors.green.shade800,
+                                                  : Colors.blue.shade800,
                                               fontSize: 11,
                                               fontWeight: FontWeight.bold,
                                             ),
@@ -493,7 +509,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                               onPressed: () {
                                                 ScaffoldMessenger.of(context).showSnackBar(
                                                   SnackBar(
-                                                    content: Text('WhatsApp reminder sent to ${s.name} (${s.phone})!'),
+                                                    content: Text('WhatsApp receipt / reminder sent to ${s.name} (${s.phone})!'),
                                                     backgroundColor: Colors.green.shade700,
                                                   ),
                                                 );
@@ -550,7 +566,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
           Text(
             value,
-            style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 13),
+            style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 12),
           ),
         ],
       ),

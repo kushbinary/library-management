@@ -14,14 +14,15 @@ class AddStudentScreen extends StatefulWidget {
 class _AddStudentScreenState extends State<AddStudentScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _seatController = TextEditingController();
-  final _feeController = TextEditingController(text: '1000');
+  final _totalFeeController = TextEditingController(text: '1000');
+  final _paidAmountController = TextEditingController(text: '1000');
 
   DateTime _admissionDate = DateTime.now();
   DateTime _expiryDate = DateTime.now().add(const Duration(days: 30));
   String _selectedTiming = 'Morning (8 AM - 12 PM)';
+  String _selectedPaymentMode = 'UPI (Online)';
   bool _isLoading = false;
 
   final List<String> _timingOptions = [
@@ -32,6 +33,22 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
     'Full Day (8 AM - 8 PM)',
     '24 Hours Access',
   ];
+
+  final List<String> _paymentModes = [
+    'UPI (Online)',
+    'Cash (नकद)',
+    'Bank Transfer',
+  ];
+
+  double get _totalFee => double.tryParse(_totalFeeController.text.trim()) ?? 0.0;
+  double get _paidAmount => double.tryParse(_paidAmountController.text.trim()) ?? 0.0;
+  double get _dueAmount => (_totalFee - _paidAmount) > 0 ? (_totalFee - _paidAmount) : 0.0;
+
+  String get _paymentStatus {
+    if (_paidAmount <= 0) return 'Due';
+    if (_dueAmount > 0) return 'Partial';
+    return 'Paid';
+  }
 
   Future<void> _pickDate(bool isAdmission) async {
     final initialDate = isAdmission ? _admissionDate : _expiryDate;
@@ -62,17 +79,19 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
 
     final prefs = await SharedPreferences.getInstance();
     final currentUser = prefs.getString('current_logged_in_user') ?? 'kushbinary';
-    final fee = double.tryParse(_feeController.text.trim()) ?? 1000.0;
 
     final student = Student(
       name: _nameController.text.trim(),
-      email: _emailController.text.trim(),
       phone: _phoneController.text.trim(),
       admissionDate: DateFormat('yyyy-MM-dd').format(_admissionDate),
       timing: _selectedTiming,
       seatNumber: _seatController.text.trim().toUpperCase(),
       expiryDate: DateFormat('yyyy-MM-dd').format(_expiryDate),
-      feeAmount: fee,
+      totalFee: _totalFee,
+      paidAmount: _paidAmount,
+      dueAmount: _dueAmount,
+      paymentMode: _selectedPaymentMode,
+      paymentStatus: _paymentStatus,
     );
 
     final success = await ApiService.addStudentForUser(currentUser, student);
@@ -87,17 +106,18 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
               children: [
                 const Icon(Icons.check_circle, color: Colors.white),
                 const SizedBox(width: 10),
-                Text('Student ${student.name} added (Fee: ₹${fee.toInt()})! 🎉'),
+                Text('${student.name} Registered! (Paid: ₹${_paidAmount.toInt()}, Due: ₹${_dueAmount.toInt()}) 🎉'),
               ],
             ),
             backgroundColor: Colors.green.shade700,
+            duration: const Duration(seconds: 3),
           ),
         );
         Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to save student. Please retry.'),
+            content: Text('Error saving student. Please retry.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -110,171 +130,255 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
     final dateFormat = DateFormat('dd MMM yyyy');
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        title: const Text('Register New Student'),
+        title: const Text('Add New Student', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         backgroundColor: Colors.deepPurple.shade700,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: 'Student Full Name',
-                  prefixIcon: const Icon(Icons.person_outline),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                validator: (val) =>
-                    val == null || val.isEmpty ? 'Please enter name' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  labelText: 'Email Address',
-                  prefixIcon: const Icon(Icons.email_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                validator: (val) =>
-                    val == null || !val.contains('@') ? 'Enter valid email' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(
-                  labelText: 'Phone / WhatsApp Number',
-                  prefixIcon: const Icon(Icons.phone_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                validator: (val) =>
-                    val == null || val.length < 10 ? 'Enter valid 10-digit number' : null,
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedTiming,
-                decoration: InputDecoration(
-                  labelText: 'Slot / Timing',
-                  prefixIcon: const Icon(Icons.access_time),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                items: _timingOptions.map((opt) {
-                  return DropdownMenuItem(value: opt, child: Text(opt));
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _selectedTiming = val);
-                },
-              ),
-              const SizedBox(height: 16),
-              Row(
+              // 1. STUDENT BASIC INFO CARD
+              _buildSectionCard(
+                title: 'Student Details',
+                icon: Icons.person_rounded,
+                iconColor: Colors.deepPurple.shade700,
                 children: [
-                  Expanded(
-                    flex: 5,
-                    child: TextFormField(
-                      controller: _seatController,
-                      decoration: InputDecoration(
-                        labelText: 'Seat No (e.g. S-10)',
-                        prefixIcon: const Icon(Icons.chair_outlined),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      validator: (val) =>
-                          val == null || val.isEmpty ? 'Enter seat' : null,
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: _inputDecoration(
+                      label: 'Student Full Name *',
+                      hint: 'e.g. Rahul Kumar',
+                      icon: Icons.badge_outlined,
                     ),
+                    validator: (val) => val == null || val.isEmpty ? 'Student name zaroori hai' : null,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 6,
-                    child: TextFormField(
-                      controller: _feeController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: 'Monthly Fee (₹)',
-                        prefixIcon: const Icon(Icons.currency_rupee_rounded),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      validator: (val) =>
-                          val == null || val.isEmpty ? 'Enter fee' : null,
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: _inputDecoration(
+                      label: 'WhatsApp / Mobile Number *',
+                      hint: 'e.g. 9876543210',
+                      icon: Icons.phone_android_rounded,
                     ),
+                    validator: (val) => val == null || val.length < 10 ? 'Sahi 10-digit mobile number enter karein' : null,
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              // Quick Fee Suggestion Chips
-              Row(
+              const SizedBox(height: 14),
+
+              // 2. SEAT & SLOT CARD
+              _buildSectionCard(
+                title: 'Seat & Slot Allocation',
+                icon: Icons.chair_rounded,
+                iconColor: Colors.indigo.shade700,
                 children: [
-                  Text('Quick Fee: ', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                  ...[800, 1000, 1200, 1500].map((amt) {
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 6.0),
-                      child: ActionChip(
-                        label: Text('₹$amt', style: const TextStyle(fontSize: 11)),
-                        padding: EdgeInsets.zero,
-                        onPressed: () {
-                          setState(() => _feeController.text = amt.toString());
-                        },
-                      ),
-                    );
-                  }).toList(),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _pickDate(true),
-                      icon: const Icon(Icons.calendar_today, size: 18),
-                      label: Text(
-                        'Join: ${dateFormat.format(_admissionDate)}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: TextFormField(
+                          controller: _seatController,
+                          textCapitalization: TextCapitalization.characters,
+                          decoration: _inputDecoration(
+                            label: 'Seat No *',
+                            hint: 'S-01',
+                            icon: Icons.event_seat_rounded,
+                          ),
+                          validator: (val) => val == null || val.isEmpty ? 'Seat number daalein' : null,
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _pickDate(false),
-                      icon: const Icon(Icons.event_busy, size: 18),
-                      label: Text(
-                        'Expiry: ${dateFormat.format(_expiryDate)}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 7,
+                        child: DropdownButtonFormField<String>(
+                          initialValue: _selectedTiming,
+                          decoration: _inputDecoration(
+                            label: 'Slot Timing',
+                            icon: Icons.access_time_rounded,
+                          ),
+                          items: _timingOptions.map((opt) {
+                            return DropdownMenuItem(value: opt, child: Text(opt, style: const TextStyle(fontSize: 13)));
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setState(() => _selectedTiming = val);
+                          },
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 14),
+
+              // 3. SMART PAYMENT & FEES CARD
+              _buildSectionCard(
+                title: 'Fees & Payment Collection',
+                icon: Icons.account_balance_wallet_rounded,
+                iconColor: Colors.teal.shade700,
+                children: [
+                  // Total Fee and Paid Amount Row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _totalFeeController,
+                          keyboardType: TextInputType.number,
+                          onChanged: (val) {
+                            setState(() {
+                              _paidAmountController.text = val;
+                            });
+                          },
+                          decoration: _inputDecoration(
+                            label: 'Total Fee (कुल फीस) *',
+                            hint: '1000',
+                            icon: Icons.currency_rupee_rounded,
+                          ),
+                          validator: (val) => val == null || val.isEmpty ? 'Total fee daalein' : null,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _paidAmountController,
+                          keyboardType: TextInputType.number,
+                          onChanged: (_) => setState(() {}),
+                          decoration: _inputDecoration(
+                            label: 'Paid Amount (जमा राशि) *',
+                            hint: '1000',
+                            icon: Icons.check_circle_outline,
+                          ),
+                          validator: (val) => val == null || val.isEmpty ? 'Paid amount daalein' : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Quick Fee Shortcuts
+                  Row(
+                    children: [
+                      Text('Quick Set: ', style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+                      ...[800, 1000, 1200, 1500].map((amt) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6.0),
+                          child: InkWell(
+                            onTap: () {
+                              setState(() {
+                                _totalFeeController.text = amt.toString();
+                                _paidAmountController.text = amt.toString();
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.teal.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.teal.shade200),
+                              ),
+                              child: Text('₹$amt', style: TextStyle(fontSize: 11, color: Colors.teal.shade900, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Live Fee Summary Card (Payment Calculation Box)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _dueAmount > 0 ? Colors.amber.shade50 : Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _dueAmount > 0 ? Colors.amber.shade300 : Colors.green.shade300,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildFeeStatItem('Paid (जमा)', '₹${_paidAmount.toInt()}', Colors.green.shade800),
+                        Container(width: 1, height: 28, color: Colors.grey.shade300),
+                        _buildFeeStatItem('Due (बकाया)', '₹${_dueAmount.toInt()}', _dueAmount > 0 ? Colors.red.shade700 : Colors.grey.shade700),
+                        Container(width: 1, height: 28, color: Colors.grey.shade300),
+                        _buildFeeStatItem('Status', _paymentStatus.toUpperCase(), _paymentStatus == 'Paid' ? Colors.green.shade800 : Colors.orange.shade800),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Payment Mode Dropdown
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedPaymentMode,
+                    decoration: _inputDecoration(
+                      label: 'Payment Mode (भुगतान का माध्यम)',
+                      icon: Icons.payments_rounded,
+                    ),
+                    items: _paymentModes.map((mode) {
+                      return DropdownMenuItem(value: mode, child: Text(mode, style: const TextStyle(fontSize: 14)));
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) setState(() => _selectedPaymentMode = val);
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // 4. VALIDITY DATES CARD
+              _buildSectionCard(
+                title: 'Membership Validity',
+                icon: Icons.calendar_month_rounded,
+                iconColor: Colors.blue.shade700,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _pickDate(true),
+                          icon: const Icon(Icons.login_rounded, size: 16, color: Colors.blue),
+                          label: Text(
+                            'Join: ${dateFormat.format(_admissionDate)}',
+                            style: const TextStyle(fontSize: 12, color: Colors.black87),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            backgroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _pickDate(false),
+                          icon: const Icon(Icons.event_busy_rounded, size: 16, color: Colors.redAccent),
+                          label: Text(
+                            'Expiry: ${dateFormat.format(_expiryDate)}',
+                            style: const TextStyle(fontSize: 12, color: Colors.black87),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            backgroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // 5. SUBMIT BUTTON
               SizedBox(
                 height: 52,
                 child: ElevatedButton.icon(
@@ -283,28 +387,114 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                       ? const SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
-                      : const Icon(Icons.check_circle_outline),
+                      : const Icon(Icons.check_circle_rounded, size: 22),
                   label: Text(
-                    _isLoading ? 'Registering...' : 'Register Student & Collect Fee',
+                    _isLoading ? 'Saving...' : 'Register Student & Collect ₹${_paidAmount.toInt()}',
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.deepPurple.shade700,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(16),
                     ),
+                    elevation: 3,
                   ),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required Color iconColor,
+    required List<Widget> children,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: iconColor, size: 18),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.grey.shade900,
                 ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 14),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeeStatItem(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade700)),
+        const SizedBox(height: 2),
+        Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
+      ],
+    );
+  }
+
+  InputDecoration _inputDecoration({
+    required String label,
+    String? hint,
+    required IconData icon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: Icon(icon, size: 20, color: Colors.deepPurple.shade600),
+      filled: true,
+      fillColor: const Color(0xFFF8FAFC),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade200),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.deepPurple.shade700, width: 1.5),
       ),
     );
   }
