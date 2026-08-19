@@ -41,6 +41,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final confirmPinCtrl = TextEditingController();
     String? dialogError;
 
+    final isHi = _settings.isHindi;
+
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -58,7 +60,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(width: 10),
               Text(
-                _settings.isHindi ? '4-Digit PIN बदलें' : 'Change 4-Digit PIN',
+                isHi ? '4-Digit PIN बदलें' : 'Change 4-Digit PIN',
                 style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
               ),
             ],
@@ -74,7 +76,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     maxLength: 4,
                     obscureText: true,
                     decoration: InputDecoration(
-                      labelText: _settings.isHindi ? 'Purana 4-Digit PIN' : 'Current 4-Digit PIN',
+                      labelText: isHi ? 'वर्तमान PIN (Current PIN)' : 'Current 4-Digit PIN',
                       prefixIcon: const Icon(Icons.lock_outline, size: 20),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     ),
@@ -87,7 +89,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   maxLength: 4,
                   obscureText: true,
                   decoration: InputDecoration(
-                    labelText: _settings.isHindi ? 'Naya 4-Digit PIN' : 'New 4-Digit PIN',
+                    labelText: isHi ? 'नया PIN (New PIN)' : 'New 4-Digit PIN',
                     prefixIcon: const Icon(Icons.pin_outlined, size: 20),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
@@ -99,7 +101,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   maxLength: 4,
                   obscureText: true,
                   decoration: InputDecoration(
-                    labelText: _settings.isHindi ? 'Naye PIN ki Pushti Karein' : 'Confirm New PIN',
+                    labelText: isHi ? 'PIN की पुष्टि करें' : 'Confirm New PIN',
                     prefixIcon: const Icon(Icons.check_circle_outline, size: 20),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
@@ -117,7 +119,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text(_settings.isHindi ? 'Cancel' : 'Cancel'),
+              child: Text(isHi ? 'रद्द करें' : 'Cancel'),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -127,15 +129,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               onPressed: () async {
                 if (_currentPin != null && oldPinCtrl.text.trim() != _currentPin) {
-                  setDialogState(() => dialogError = _settings.isHindi ? 'Purana PIN galat hai!' : 'Current PIN is incorrect!');
+                  setDialogState(() => dialogError = isHi ? 'वर्तमान PIN अमान्य है!' : 'Current PIN is incorrect!');
                   return;
                 }
                 if (newPinCtrl.text.trim().length != 4) {
-                  setDialogState(() => dialogError = _settings.isHindi ? 'PIN 4 digit ka hona chahiye!' : 'PIN must be 4 digits!');
+                  setDialogState(() => dialogError = isHi ? 'PIN 4 अंकों का होना चाहिए!' : 'PIN must be exactly 4 digits!');
                   return;
                 }
                 if (newPinCtrl.text.trim() != confirmPinCtrl.text.trim()) {
-                  setDialogState(() => dialogError = _settings.isHindi ? 'Naye PIN match nahi kar rahe!' : 'New PINs do not match!');
+                  setDialogState(() => dialogError = isHi ? 'PIN मेल नहीं खा रहा है!' : 'PINs do not match!');
                   return;
                 }
 
@@ -147,13 +149,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(_settings.isHindi ? '✅ 4-Digit PIN successfully set ho gaya!' : '✅ 4-Digit PIN successfully updated!'),
+                      content: Text(isHi ? '✅ 4-Digit PIN सफलतापूर्वक सेट हो गया!' : '✅ 4-Digit PIN successfully updated!'),
                       backgroundColor: Colors.green,
                     ),
                   );
                 }
               },
-              child: Text(_settings.isHindi ? 'PIN Save Karein' : 'Save PIN'),
+              child: Text(isHi ? 'सुरक्षित करें' : 'Save PIN'),
             ),
           ],
         ),
@@ -164,6 +166,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showUpiSettingsDialog() {
     final upiCtrl = TextEditingController(text: _settings.upiId);
     final nameCtrl = TextEditingController(text: _settings.businessName);
+    final isHi = _settings.isHindi;
 
     showDialog(
       context: context,
@@ -174,7 +177,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const Icon(Icons.qr_code_2_rounded, color: Color(0xFF4338CA)),
             const SizedBox(width: 8),
             Text(
-              _settings.isHindi ? 'UPI Payment Settings' : 'UPI Payment Settings',
+              isHi ? 'UPI पेमेंट सेटिंग्स' : 'UPI Payment Settings',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
             ),
           ],
@@ -184,7 +187,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _settings.isHindi ? 'Apni UPI ID enter karein jisme fees QR code se receive karni hai:' : 'Enter UPI ID to receive fees via QR code:',
+              isHi
+                  ? 'शुल्क प्राप्त करने के लिए अपनी UPI ID और लाइब्रेरी का नाम दर्ज करें:'
+                  : 'Enter your UPI ID and Library Name to receive fee payments via QR code:',
               style: const TextStyle(fontSize: 12, color: Colors.black87),
             ),
             const SizedBox(height: 12),
@@ -201,7 +206,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             TextField(
               controller: nameCtrl,
               decoration: InputDecoration(
-                labelText: 'Library / Business Name',
+                labelText: isHi ? 'लाइब्रेरी का नाम' : 'Library / Business Name',
                 hintText: 'e.g. MyLibbook',
                 prefixIcon: const Icon(Icons.storefront_rounded, size: 18),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -210,7 +215,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isHi ? 'रद्द करें' : 'Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4338CA), foregroundColor: Colors.white),
             onPressed: () async {
@@ -222,12 +227,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Navigator.pop(ctx);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('✅ UPI settings updated!'), backgroundColor: Colors.green),
+                    SnackBar(
+                      content: Text(isHi ? '✅ UPI सेटिंग्स अपडेट हो गई!' : '✅ UPI settings updated successfully!'),
+                      backgroundColor: Colors.green,
+                    ),
                   );
                 }
               }
             },
-            child: Text(_settings.isHindi ? 'Save Karein' : 'Save'),
+            child: Text(isHi ? 'सुरक्षित करें' : 'Save Settings'),
           ),
         ],
       ),
@@ -236,20 +244,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _shareViaWhatsApp() async {
     const inviteMessage = 
-        'Namaste! 🙏\n\n'
-        'Kya aap bhi apni Library ko Smart aur Digital banana chahte hain?\n\n'
-        'Try *MyLibbook - Smart Library Management App* 📚✨\n\n'
+        'Greetings! 🙏\n\n'
+        'Looking to digitize and automate your Library Management operations?\n\n'
+        'Check out *MyLibbook - Smart Library Management App* 📚✨\n\n'
         '🔥 *Key Features:*\n'
-        '✅ Live Seat Matrix & Seat Arrangement\n'
+        '✅ Interactive Live Seat Arrangement Matrix\n'
         '✅ 1-Tap Direct WhatsApp Fee & Renewal Reminders\n'
-        '✅ Dynamic UPI QR Code for Instant Fee Collection\n'
-        '✅ 4-Digit Quick PIN Keypad Security\n'
-        '✅ Monthly Earnings & Due Fee Tracking\n\n'
-        '📲 *Download Android APK:*\n'
+        '✅ Dynamic UPI QR Code for Instant Payments\n'
+        '✅ 4-Digit Quick PIN Security Lock\n'
+        '✅ Automated Monthly Revenue & Due Fee Tracking\n\n'
+        '📲 *Direct Android APK Download:*\n'
         '$apkDownloadUrl\n\n'
         '🌐 *Web Portal:*\n'
         '$webAppUrl\n\n'
-        'Aaj hi download karein aur library management asaan banayein! 🚀';
+        'Download today and simplify your library administration! 🚀';
 
     final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(inviteMessage)}');
     try {
@@ -261,7 +269,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Clipboard.setData(const ClipboardData(text: apkDownloadUrl));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(_settings.isHindi ? '📋 Invite link clipboard par copy ho gaya!' : '📋 Invite link copied to clipboard!'),
+        content: Text(_settings.isHindi ? '📋 लिंक क्लिपबोर्ड पर कॉपी हो गया!' : '📋 Invite link copied to clipboard!'),
         backgroundColor: Colors.green.shade700,
       ),
     );
@@ -269,7 +277,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _openSupportWhatsApp() async {
     const phone = '919838147651';
-    final msg = Uri.encodeComponent('Namaste! Mujhe MyLibbook Application ke baare mein sahayata chahiye.');
+    final msg = Uri.encodeComponent('Hello MyLibbook Team, I need technical assistance with the application.');
     final uri = Uri.parse('https://wa.me/$phone?text=$msg');
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -294,8 +302,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         children: [
-          // 0. INVITE FRIENDS TO USE MYLIBBOOK (FEATURED BANNER)
-          _buildSectionHeader(isHi ? 'दोस्तों को आमंत्रित करें' : 'Invite Friends', Icons.card_giftcard_rounded),
+          // 1. INVITE FRIENDS TO USE MYLIBBOOK
+          _buildSectionHeader(isHi ? 'मित्रों को आमंत्रित करें' : 'Invite Friends', Icons.card_giftcard_rounded),
           Container(
             decoration: BoxDecoration(
               gradient: const LinearGradient(
@@ -336,17 +344,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              isHi ? 'Invite Friends to use MyLibbook' : 'Invite Friends to use MyLibbook',
+                              isHi ? 'MyLibbook का उपयोग करने के लिए मित्रों को आमंत्रित करें' : 'Invite Friends to Use MyLibbook',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w900,
-                                fontSize: 16,
+                                fontSize: 15,
                               ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               isHi
-                                  ? 'Apne dosto aur library sanchalako ke sath MyLibbook share karein'
+                                  ? 'साथी लाइब्रेरी संचालकों के साथ ऐप साझा करें'
                                   : 'Share MyLibbook with other library owners & friends',
                               style: const TextStyle(color: Colors.white70, fontSize: 11),
                             ),
@@ -371,7 +379,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onPressed: _shareViaWhatsApp,
                           icon: const Icon(Icons.chat_rounded, size: 16),
                           label: Text(
-                            isHi ? 'WhatsApp par Share' : 'Invite via WhatsApp',
+                            isHi ? 'WhatsApp पर शेयर करें' : 'Share via WhatsApp',
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                           ),
                         ),
@@ -389,7 +397,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onPressed: _copyInviteLink,
                           icon: const Icon(Icons.copy_rounded, size: 14),
                           label: Text(
-                            isHi ? 'Copy Link' : 'Copy Link',
+                            isHi ? 'लिंक कॉपी करें' : 'Copy Link',
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                           ),
                         ),
@@ -402,8 +410,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 20),
 
-          // 1. APP LOCK & 4-DIGIT PIN SECTION
-          _buildSectionHeader(isHi ? 'सुरक्षा एवं 4-Digit App Lock' : 'Security & 4-Digit App Lock', Icons.lock_clock_rounded),
+          // 2. SECURITY & 4-DIGIT APP LOCK
+          _buildSectionHeader(isHi ? 'सुरक्षा एवं 4-Digit ऐप लॉक' : 'Security & 4-Digit App Lock', Icons.lock_clock_rounded),
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -413,11 +421,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   SwitchListTile(
                     title: Text(
-                      isHi ? '4-Digit Quick PIN Lock' : '4-Digit Quick PIN Lock',
+                      isHi ? '4-Digit Quick PIN लॉक' : '4-Digit Quick PIN Lock',
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                     ),
                     subtitle: Text(
-                      isHi ? 'App open hote hi 4-digit PIN se instant unlock hoga' : 'Instant unlock with 4-digit PIN on app launch',
+                      isHi ? 'ऐप खोलते ही 4-अंकीय PIN द्वारा तुरंत अनलॉक करें' : 'Enable instant 4-digit PIN unlock on app launch',
                       style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                     ),
                     secondary: Container(
@@ -443,11 +451,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ListTile(
                       leading: const Icon(Icons.edit_rounded, color: Color(0xFF4338CA)),
                       title: Text(
-                        isHi ? '4-Digit PIN बदलें (Change PIN)' : 'Change 4-Digit PIN',
+                        isHi ? '4-Digit PIN बदलें' : 'Change 4-Digit PIN',
                         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                       ),
                       subtitle: Text(
-                        _currentPin != null ? (isHi ? 'PIN Set Hai (••••)' : 'PIN is active (••••)') : (isHi ? 'PIN set nahi hai' : 'No PIN set'),
+                        _currentPin != null ? (isHi ? 'PIN सक्रिय है (••••)' : 'PIN is active (••••)') : (isHi ? 'कोई PIN सेट नहीं है' : 'No PIN configured'),
                         style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                       ),
                       trailing: const Icon(Icons.chevron_right_rounded),
@@ -460,8 +468,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 20),
 
-          // 2. THEME MODE SECTION (Light, Dark, Device)
-          _buildSectionHeader(isHi ? 'थीम (Theme Mode)' : 'Appearance & Theme', Icons.palette_outlined),
+          // 3. THEME MODE SECTION
+          _buildSectionHeader(isHi ? 'थीम मोड (Theme Mode)' : 'Appearance & Theme', Icons.palette_outlined),
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -470,7 +478,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 children: [
                   RadioListTile<ThemeMode>(
-                    title: Text(isHi ? '☀️ लाइट मोड (Light Mode)' : '☀️ Light Mode', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    title: Text(isHi ? '☀️ लाइट मोड (Light Theme)' : '☀️ Light Theme', style: const TextStyle(fontWeight: FontWeight.w600)),
                     value: ThemeMode.light,
                     groupValue: _settings.themeMode,
                     activeColor: const Color(0xFF4338CA),
@@ -479,7 +487,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     },
                   ),
                   RadioListTile<ThemeMode>(
-                    title: Text(isHi ? '🌙 डार्क मोड (Dark Mode)' : '🌙 Dark Mode', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    title: Text(isHi ? '🌙 डार्क मोड (Dark Theme)' : '🌙 Dark Theme', style: const TextStyle(fontWeight: FontWeight.w600)),
                     value: ThemeMode.dark,
                     groupValue: _settings.themeMode,
                     activeColor: const Color(0xFF4338CA),
@@ -488,7 +496,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     },
                   ),
                   RadioListTile<ThemeMode>(
-                    title: Text(isHi ? '⚙️ सिस्टम / डिवाइस अनुसार (System Default)' : '⚙️ Device / System Default', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    title: Text(isHi ? '⚙️ सिस्टम डिफॉल्ट (System Default)' : '⚙️ System Default', style: const TextStyle(fontWeight: FontWeight.w600)),
                     value: ThemeMode.system,
                     groupValue: _settings.themeMode,
                     activeColor: const Color(0xFF4338CA),
@@ -502,7 +510,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 20),
 
-          // 3. LANGUAGE SECTION (English / Hindi)
+          // 4. LANGUAGE SECTION
           _buildSectionHeader(isHi ? 'भाषा (Language)' : 'Language', Icons.language_rounded),
           Card(
             elevation: 2,
@@ -511,28 +519,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: () => _settings.setLanguage('hi'),
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          color: isHi ? const Color(0xFFEEF2FF) : Colors.transparent,
-                          border: Border.all(color: isHi ? const Color(0xFF4338CA) : Colors.grey.shade300, width: isHi ? 2 : 1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          children: [
-                            const Text('🇮🇳', style: TextStyle(fontSize: 22)),
-                            const SizedBox(height: 4),
-                            Text('हिन्दी (Hindi)', style: TextStyle(fontWeight: FontWeight.bold, color: isHi ? const Color(0xFF4338CA) : (isDark ? Colors.white : Colors.black87))),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
                   Expanded(
                     child: InkWell(
                       onTap: () => _settings.setLanguage('en'),
@@ -554,14 +540,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => _settings.setLanguage('hi'),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isHi ? const Color(0xFFEEF2FF) : Colors.transparent,
+                          border: Border.all(color: isHi ? const Color(0xFF4338CA) : Colors.grey.shade300, width: isHi ? 2 : 1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text('🇮🇳', style: TextStyle(fontSize: 22)),
+                            const SizedBox(height: 4),
+                            Text('हिन्दी (Hindi)', style: TextStyle(fontWeight: FontWeight.bold, color: isHi ? const Color(0xFF4338CA) : (isDark ? Colors.white : Colors.black87))),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 20),
 
-          // 4. UPI QR SETTINGS
-          _buildSectionHeader(isHi ? 'UPI पेमेंट सेटिंग्स' : 'UPI Payment Settings', Icons.qr_code_rounded),
+          // 5. UPI PAYMENT CONFIGURATION
+          _buildSectionHeader(isHi ? 'UPI पेमेंट सेटिंग्स' : 'UPI Payment Configuration', Icons.qr_code_rounded),
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -572,18 +580,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.green),
               ),
               title: Text(_settings.upiId, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              subtitle: Text('Payee Name: ${_settings.businessName}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+              subtitle: Text(
+                isHi ? 'प्राप्तकर्ता का नाम: ${_settings.businessName}' : 'Beneficiary Name: ${_settings.businessName}',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
               trailing: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4338CA), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4)),
                 onPressed: _showUpiSettingsDialog,
-                child: Text(isHi ? 'बदलें' : 'Edit', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                child: Text(isHi ? 'संपादित करें' : 'Edit', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
               ),
             ),
           ),
           const SizedBox(height: 20),
 
-          // 5. HELP & SUPPORT SECTION
-          _buildSectionHeader(isHi ? 'सहायता एवं संपर्क (Help & Support)' : 'Help & Support', Icons.support_agent_rounded),
+          // 6. HELP & SUPPORT SECTION
+          _buildSectionHeader(isHi ? 'सहायता एवं संपर्क' : 'Help & Support', Icons.support_agent_rounded),
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -596,7 +607,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: const Icon(Icons.chat_rounded, color: Colors.green),
                   ),
                   title: Text(isHi ? 'WhatsApp सहायता' : 'WhatsApp Support', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: Text(isHi ? 'Direct WhatsApp par team se sampark karein' : 'Chat with technical support team', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  subtitle: Text(isHi ? 'सीधे WhatsApp पर तकनीकी सहायता प्राप्त करें' : 'Get instant technical support on WhatsApp', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                   trailing: const Icon(Icons.open_in_new_rounded, size: 18),
                   onTap: _openSupportWhatsApp,
                 ),
@@ -607,7 +618,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(10)),
                     child: const Icon(Icons.email_outlined, color: Colors.blue),
                   ),
-                  title: Text(isHi ? 'Email Support' : 'Email Support', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  title: Text(isHi ? 'ईमेल सहायता' : 'Email Support', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   subtitle: const Text('kushbinary@gmail.com', style: TextStyle(fontSize: 12, color: Colors.grey)),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () async {
@@ -622,8 +633,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 20),
 
-          // 6. ABOUT US SECTION
-          _buildSectionHeader(isHi ? 'ऐप के बारे में (About Us)' : 'About Us', Icons.info_outline_rounded),
+          // 7. ABOUT US & COPYRIGHT SECTION
+          _buildSectionHeader(isHi ? 'ऐप के बारे में' : 'About MyLibbook', Icons.info_outline_rounded),
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -651,7 +662,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             Text('MyLibbook Pro', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: Color(0xFF1E1B4B))),
                             Text('Smart. Organized. Knowledge.', style: TextStyle(color: Color(0xFF0284C7), fontSize: 12, fontWeight: FontWeight.w600)),
                             SizedBox(height: 2),
-                            Text('Version 1.0.0 (Release Build)', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                            Text('Version 1.0.0 (Official Release Build)', style: TextStyle(fontSize: 11, color: Colors.grey)),
                           ],
                         ),
                       ),
@@ -662,9 +673,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 8),
                   Text(
                     isHi
-                        ? 'MyLibbook ek modern automated library management platform hai jo seat allocation, automated WhatsApp reminders, UPI QR collection, aur secure 4-digit lock pradan karta hai.'
-                        : 'MyLibbook is an automated library management platform providing intelligent seat matrices, direct WhatsApp notifications, UPI QR fee collections, and instant 4-digit PIN security.',
+                        ? 'MyLibbook एक आधुनिक डिजिटल लाइब्रेरी प्रबंधन प्रणाली है, जो स्मार्ट सीट आवंटन, स्वचालित WhatsApp सूचनाएं, UPI QR शुल्क संग्रह और त्वरित 4-अंकीय सुरक्षा पिन प्रदान करता है।'
+                        : 'MyLibbook is an automated digital library management platform providing intelligent seat allocation matrices, direct WhatsApp reminders, UPI QR payments, and secure 4-digit PIN authentication.',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.4),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.grey.shade900 : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text(
+                          '© 2026 MyLibbook. All Rights Reserved.',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF4338CA)),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Designed & Developed by Kush Binary',
+                          style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),

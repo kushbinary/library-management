@@ -119,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _unlockAndProceed();
       } else {
         setState(() {
-          _errorMessage = 'Galat PIN! Kripya sahi 4-digit PIN enter karein.';
+          _errorMessage = 'Incorrect PIN! Please enter your valid 4-digit PIN.';
           _enteredPin = '';
         });
       }
@@ -141,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _unlockAndProceed();
       } else {
         setState(() {
-          _errorMessage = 'PIN match nahi hua! Dobara create karein.';
+          _errorMessage = 'PINs do not match! Please create your PIN again.';
           _enteredPin = '';
           _tempCreatedPin = '';
           _authMode = AuthMode.createPin;
@@ -180,7 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final pass = _loginPassCtrl.text;
 
     if (user.isEmpty || pass.isEmpty) {
-      setState(() => _errorMessage = 'Username aur Password enter karein.');
+      setState(() => _errorMessage = 'Please enter both Username and Password.');
       return;
     }
 
@@ -213,7 +213,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } else {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Galat Username ya Password!';
+        _errorMessage = 'Invalid Username or Password!';
       });
     }
   }
@@ -226,22 +226,22 @@ class _LoginScreenState extends State<LoginScreen> {
     final confirmPass = _signupConfirmPassCtrl.text;
 
     if (name.isEmpty || email.isEmpty || pass.isEmpty || secKey.isEmpty) {
-      setState(() => _errorMessage = 'Sabhi fields bharna anivarya hai.');
+      setState(() => _errorMessage = 'Please fill in all required fields.');
       return;
     }
 
     if (secKey != masterSecurityCode) {
-      setState(() => _errorMessage = 'Galat Master Security Key! Contact Admin.');
+      setState(() => _errorMessage = 'Invalid Master Security Key! Please contact Admin.');
       return;
     }
 
     if (pass != confirmPass) {
-      setState(() => _errorMessage = 'Passwords match nahi kar rahe hain.');
+      setState(() => _errorMessage = 'Passwords do not match.');
       return;
     }
 
     if (pass.length < 6) {
-      setState(() => _errorMessage = 'Password kam se kam 6 characters ka hona chahiye.');
+      setState(() => _errorMessage = 'Password must be at least 6 characters long.');
       return;
     }
 
@@ -315,16 +315,16 @@ class _LoginScreenState extends State<LoginScreen> {
   // ================= 1. ULTRA-MODERN 4-DIGIT PIN KEYPAD VIEW =================
   Widget _buildPinView() {
     String title = 'Enter 4-Digit Quick PIN';
-    String subtitle = 'Apna 4-digit PIN enter karke instant unlock karein';
+    String subtitle = 'Enter your 4-digit PIN for instant access';
     IconData headerIcon = Icons.lock_outline_rounded;
 
     if (_authMode == AuthMode.createPin) {
       title = 'Set 4-Digit Quick PIN';
-      subtitle = 'Baar-baar login se bachne ke liye 4-digit PIN banayein';
+      subtitle = 'Create a 4-digit PIN for quick and secure access';
       headerIcon = Icons.pin_outlined;
     } else if (_authMode == AuthMode.confirmPin) {
       title = 'Confirm Quick PIN';
-      subtitle = 'Confirmation ke liye dobara wahi 4-digit PIN dalein';
+      subtitle = 'Re-enter your 4-digit PIN to confirm';
       headerIcon = Icons.check_circle_outline_rounded;
     }
 
