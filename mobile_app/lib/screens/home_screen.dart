@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -24,7 +25,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   List<String> _seatList = [];
   String _upiId = 'kushbinary@okaxis';
-  String _businessName = 'Library Hub';
+  String _businessName = 'MyLibbook';
 
   final List<String> _timingOptions = [
     'Morning (8 AM - 12 PM)',
@@ -52,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final prefs = await SharedPreferences.getInstance();
     final user = prefs.getString('current_logged_in_user') ?? 'kushbinary';
     final upi = prefs.getString('library_custom_upi_id') ?? 'kushbinary@okaxis';
-    final bName = prefs.getString('library_custom_business_name') ?? 'Library Hub';
+    final bName = prefs.getString('library_custom_business_name') ?? 'MyLibbook';
     setState(() {
       _currentUser = user;
       _upiId = upi;
@@ -71,44 +72,198 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     });
   }
 
-  // ================= DIRECT WHATSAPP REDIRECTION =================
-  Future<void> _openWhatsAppDirect(Student student) async {
-    String phone = student.phone.replaceAll(RegExp(r'[^0-9]'), '');
-    if (phone.length == 10) {
-      phone = '91$phone';
+  // ================= DIRECT WHATSAPP LAUNCHER =================
+  Future<void> _launchWhatsAppMessage(String phone, String message) async {
+    String cleanPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleanPhone.length == 10) {
+      cleanPhone = '91$cleanPhone';
     }
 
-    String statusText = student.isExpired
-        ? 'Membership EXPIRED ho chuki hai ⚠️'
-        : 'Membership mein ${student.daysRemaining} din bache hain ⏳';
+    final encodedMsg = Uri.encodeComponent(message);
+    final webUrl = Uri.parse('https://api.whatsapp.com/send?phone=$cleanPhone&text=$encodedMsg');
+    final appUrl = Uri.parse('whatsapp://send?phone=$cleanPhone&text=$encodedMsg');
 
-    String dueText = student.dueAmount > 0
-        ? '\n💰 Bacha Hua Shulk (Due Fee): ₹${student.dueAmount.toInt()}'
-        : '\n✅ Total Fee Paid';
-
-    String message =
-        'Namaste ${student.name} ji 🙏\n\n'
-        '📚 *$_businessName - Library Reminder*\n'
-        '🪑 Seat Number: *${student.seatNumber}*\n'
-        '⏰ Shift / Timing: *${student.timing}*\n'
-        '📅 Validity / Expiry: *${student.expiryDate}*\n'
-        '📌 Status: *$statusText*$dueText\n\n'
-        '💳 UPI Payment ID: *$_upiId*\n\n'
-        'Kripya samay par renewal kar lein taaki aapki seat reserve rahe.\n'
-        'Dhanyawad! 📖';
-
-    final uri = Uri.parse('https://wa.me/$phone?text=${Uri.encodeComponent(message)}');
     try {
-      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!launched) {
-        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      if (kIsWeb) {
+        await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+      } else {
+        if (await canLaunchUrl(appUrl)) {
+          await launchUrl(appUrl, mode: LaunchMode.externalApplication);
+        } else {
+          await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+        }
       }
     } catch (_) {
-      await launchUrl(uri, mode: LaunchMode.platformDefault);
+      await launchUrl(webUrl, mode: LaunchMode.externalApplication);
     }
   }
 
-  // Show list of students whose validity is expiring or due for quick 1-tap WhatsApp
+  // Generate Default Due Fee Message
+  String _generateDueFeeMessage(Student student) {
+    final dueAmt = student.dueAmount > 0 ? student.dueAmount.toInt() : (student.totalFee - student.paidAmount).toInt();
+    return 'Namaste ${student.name} ji 🙏\n\n'
+        'Aapka library fee due (bakaya) hai. Kripya jaldi se jaldi apni bachi hui fee jama kijye taaki aapki seat reserve rahe.\n\n'
+        '📚 *Library:* $_businessName\n'
+        '🪑 *Seat Number:* ${student.seatNumber}\n'
+        '⏰ *Shift / Timing:* ${student.timing}\n'
+        '💰 *Due Amount (बकाया फीस):* ₹${dueAmt > 0 ? dueAmt : student.totalFee.toInt()}\n'
+        '📅 *Valid Till:* ${student.expiryDate}\n'
+        '💳 *UPI ID for Payment:* $_upiId\n\n'
+        'Kripya fee jama karke payment screenshot bhejein.\n'
+        'Dhanyawad! 📖';
+  }
+
+  // Generate Expiry Renewal Message
+  String _generateExpiryMessage(Student student) {
+    return 'Namaste ${student.name} ji 🙏\n\n'
+        'Aapki library membership ${student.isExpired ? 'EXPIRE ho chuki hai ⚠️' : 'khatam hone wali hai (${student.daysRemaining} din bache hain) ⏳'}.\n\n'
+        'Kripya samay par renewal kar lein taaki aapki Seat ${student.seatNumber} kisi aur ko allot na ho.\n\n'
+        '📚 *Library:* $_businessName\n'
+        '🪑 *Seat Number:* ${student.seatNumber}\n'
+        '⏰ *Timing:* ${student.timing}\n'
+        '📅 *Expiry Date:* ${student.expiryDate}\n'
+        '💳 *UPI ID:* $_upiId\n\n'
+        'Dhanyawad! 📖';
+  }
+
+  // ================= WHATSAPP INTERFACE MODAL =================
+  void _showWhatsAppSenderModal(Student student) {
+    String currentText = student.dueAmount > 0 
+        ? _generateDueFeeMessage(student) 
+        : _generateExpiryMessage(student);
+    
+    final messageCtrl = TextEditingController(text: currentText);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+            top: 20,
+            left: 20,
+            right: 20,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.chat_rounded, color: Colors.green, size: 24),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('WhatsApp Notification', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+                            Text('To: ${student.name} (${student.phone})', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                          ],
+                        ),
+                      ],
+                    ),
+                    IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(ctx)),
+                  ],
+                ),
+                const Divider(height: 20),
+
+                // Quick Message Templates
+                const Text('Choose Message Template (मैसेज चुनें):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ActionChip(
+                        avatar: const Icon(Icons.currency_rupee_rounded, size: 14, color: Colors.amber),
+                        label: const Text('Fee Due Reminder', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        backgroundColor: Colors.amber.shade50,
+                        onPressed: () {
+                          setModalState(() {
+                            messageCtrl.text = _generateDueFeeMessage(student);
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ActionChip(
+                        avatar: const Icon(Icons.timelapse_rounded, size: 14, color: Colors.indigo),
+                        label: const Text('Validity Renewal', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        backgroundColor: Colors.indigo.shade50,
+                        onPressed: () {
+                          setModalState(() {
+                            messageCtrl.text = _generateExpiryMessage(student);
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Message Preview / Editor
+                const Text('Message Text (WhatsApp Chat Box mein type ho jayega):', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: messageCtrl,
+                  maxLines: 7,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade300)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade200)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Open WhatsApp & Send Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade600,
+                      foregroundColor: Colors.white,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _launchWhatsAppMessage(student.phone, messageCtrl.text.trim());
+                    },
+                    icon: const Icon(Icons.send_rounded, size: 20),
+                    label: Text(
+                      'Open WhatsApp & Send to ${student.name.split(" ").first}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Bulk WhatsApp Reminders Sheet
   void _showBulkWhatsAppModal() {
     final pending = _students.where((s) => s.isExpired || s.daysRemaining <= 5 || s.dueAmount > 0).toList();
 
@@ -131,7 +286,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Direct WhatsApp Reminders', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
-                      Text('Direct aapke WhatsApp app se message send hoga', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      Text('Click karte hi WhatsApp app pe direct chat typing ho jayegi', style: TextStyle(fontSize: 11, color: Colors.grey)),
                     ],
                   ),
                 ),
@@ -157,18 +312,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: s.isExpired ? Colors.red.shade100 : Colors.indigo.shade100,
-                          child: Text(s.seatNumber, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: s.isExpired ? Colors.red : Colors.indigo)),
+                          backgroundColor: s.isExpired ? Colors.red.shade100 : (s.dueAmount > 0 ? Colors.amber.shade100 : Colors.indigo.shade100),
+                          child: Text(s.seatNumber, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: s.isExpired ? Colors.red : (s.dueAmount > 0 ? Colors.amber.shade900 : Colors.indigo))),
                         ),
                         title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                         subtitle: Text(
-                          s.isExpired ? '⚠️ Expired • Mobile: ${s.phone}' : 'Due: ₹${s.dueAmount.toInt()} • ${s.daysRemaining}d left',
-                          style: TextStyle(color: s.isExpired ? Colors.red : Colors.grey.shade700, fontSize: 12),
+                          s.dueAmount > 0 ? '⚠️ Due: ₹${s.dueAmount.toInt()} • Mobile: ${s.phone}' : '${s.isExpired ? "Expired" : "${s.daysRemaining}d left"} • ${s.phone}',
+                          style: TextStyle(color: s.dueAmount > 0 ? Colors.amber.shade900 : (s.isExpired ? Colors.red : Colors.grey.shade700), fontSize: 12),
                         ),
                         trailing: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, elevation: 0),
                           onPressed: () {
-                            _openWhatsAppDirect(s);
+                            Navigator.pop(ctx);
+                            _showWhatsAppSenderModal(s);
                           },
                           icon: const Icon(Icons.send_rounded, size: 14),
                           label: const Text('Send WA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
@@ -236,7 +392,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               controller: nameCtrl,
               decoration: InputDecoration(
                 labelText: 'Library / Business Name',
-                hintText: 'e.g. Kush Library',
+                hintText: 'e.g. MyLibbook',
                 prefixIcon: const Icon(Icons.storefront_rounded, size: 18),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
@@ -249,7 +405,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4338CA), foregroundColor: Colors.white),
             onPressed: () async {
               if (upiCtrl.text.trim().isNotEmpty) {
-                await _saveUpiSettings(upiCtrl.text.trim(), nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : 'Library Hub');
+                await _saveUpiSettings(upiCtrl.text.trim(), nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : 'MyLibbook');
                 Navigator.pop(ctx);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -480,7 +636,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
   }
 
-  // ================= 1. SMART EDIT STUDENT & COLLECT DUE FEE MODAL =================
+  // ================= SMART EDIT STUDENT & COLLECT DUE FEE MODAL =================
   void _showEditStudentModal(Student s) {
     final nameCtrl = TextEditingController(text: s.name);
     final phoneCtrl = TextEditingController(text: s.phone);
@@ -1453,7 +1609,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                         ),
                                         const SizedBox(width: 6),
 
-                                        // Validity & WhatsApp Action
+                                        // Validity & Actions
                                         Column(
                                           crossAxisAlignment: CrossAxisAlignment.end,
                                           children: [
@@ -1483,8 +1639,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                                   icon: const Icon(Icons.chat_rounded, color: Colors.green, size: 22),
                                                   padding: EdgeInsets.zero,
                                                   constraints: const BoxConstraints(),
-                                                  tooltip: 'Direct WhatsApp Reminder',
-                                                  onPressed: () => _openWhatsAppDirect(s),
+                                                  tooltip: 'Send Direct WhatsApp Fee Reminder',
+                                                  onPressed: () => _showWhatsAppSenderModal(s),
                                                 ),
                                                 const SizedBox(width: 8),
                                                 IconButton(
@@ -1524,6 +1680,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                           ),
                                           Row(
                                             children: [
+                                              // Direct WhatsApp Fee Due Reminder Button
+                                              IconButton(
+                                                icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.green, size: 20),
+                                                padding: EdgeInsets.zero,
+                                                constraints: const BoxConstraints(),
+                                                tooltip: 'Send WhatsApp Reminder',
+                                                onPressed: () => _showWhatsAppSenderModal(s),
+                                              ),
+                                              const SizedBox(width: 8),
                                               if (s.dueAmount > 0) ...[
                                                 IconButton(
                                                   icon: const Icon(Icons.qr_code_2_rounded, color: Color(0xFF4338CA), size: 22),
@@ -1799,7 +1964,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(ctx);
-                      _openWhatsAppDirect(student);
+                      _showWhatsAppSenderModal(student);
                     },
                     icon: const Icon(Icons.chat_rounded, size: 18),
                     label: const Text('WhatsApp'),
