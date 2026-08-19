@@ -7,10 +7,10 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.0
-      - key: DATABASE_URL
-        value: "postgresql://library_db_kzqc_user:Ia73QUIvbQgFR6rg6MTyuwAhTyao0trB@dpg-da2ufl6k1f9s73ddbn3g-a/library_db_kzqc"
       - key: SECRET_KEY
         generateValue: true
+      - key: DATABASE_URL
+        sync: false
       - key: TWILIO_ACCOUNT_SID
         sync: false
       - key: TWILIO_AUTH_TOKEN
