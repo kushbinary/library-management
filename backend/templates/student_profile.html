@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}Student Profile - Library Management{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-dark text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h3><i class="bi bi-person-check"></i> Student Profile</h3>
+                        <span class="badge bg-danger status-badge">
+                            {% if student.is_expired() %}
+                                Expired
+                            {% else %}
+                                Active
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="row">
+                        <div class="col-6 py-3 px-4 border-bottom">
+                            <small class="text-muted">Name</small>
+                            <h4>{{ student.name }}</h4>
+                        </div>
+                        <div class="col-6 py-3 px-4 border-bottom">
+                            <small class="text-muted">Seat Number</small>
+                            <h4>{{ student.seat_number }}</h4>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-6 py-3 px-4 border-bottom">
+                            <small class="text-muted">Email</small>
+                            <p>{{ student.email }}</p>
+                        </div>
+                        <div class="col-6 py-3 px-4 border-bottom">
+                            <small class="text-muted">Phone</small>
+                            <p>{{ student.phone }}</p>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-6 py-3 px-4 border-bottom">
+                            <small class="text-muted">Admission Date</small>
+                            <p>{{ student.admission_date }}</p>
+                        </div>
+                        <div class="col-6 py-3 px-4 border-bottom">
+                            <small class="text-muted">Timing</small>
+                            <p>{{ student.timing }}</p>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-6 py-3 px-4 border-bottom">
+                            <small class="text-muted">Expiry Date</small>
+                            <p>{{ student.expiry_date }}</p>
+                        </div>
+                        <div class="col-6 py-3 px-4">
+                            <small class="text-muted">Days Remaining</small>
+                            <p><strong>{{ student.days_remaining() }}</strong> days</p>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-body-secondary">
+                        <a href="{{ url_for('send_reminder', student_id=student.id) }}" class="btn btn-outline-danger">
+                            <i class="bi bi-bell"></i> Send Expiry Reminder
+                        </a>
+                        <a href="{{ url_for('student_list') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left-circle"></i> Back to List
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
