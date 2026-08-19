@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/student.dart';
 import '../services/api_service.dart';
 import 'add_student_screen.dart';
@@ -68,6 +69,119 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       _students = data;
       _isLoading = false;
     });
+  }
+
+  // ================= DIRECT WHATSAPP REDIRECTION =================
+  Future<void> _openWhatsAppDirect(Student student) async {
+    String phone = student.phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (phone.length == 10) {
+      phone = '91$phone';
+    }
+
+    String statusText = student.isExpired
+        ? 'Membership EXPIRED ho chuki hai ⚠️'
+        : 'Membership mein ${student.daysRemaining} din bache hain ⏳';
+
+    String dueText = student.dueAmount > 0
+        ? '\n💰 Bacha Hua Shulk (Due Fee): ₹${student.dueAmount.toInt()}'
+        : '\n✅ Total Fee Paid';
+
+    String message =
+        'Namaste ${student.name} ji 🙏\n\n'
+        '📚 *$_businessName - Library Reminder*\n'
+        '🪑 Seat Number: *${student.seatNumber}*\n'
+        '⏰ Shift / Timing: *${student.timing}*\n'
+        '📅 Validity / Expiry: *${student.expiryDate}*\n'
+        '📌 Status: *$statusText*$dueText\n\n'
+        '💳 UPI Payment ID: *$_upiId*\n\n'
+        'Kripya samay par renewal kar lein taaki aapki seat reserve rahe.\n'
+        'Dhanyawad! 📖';
+
+    final uri = Uri.parse('https://wa.me/$phone?text=${Uri.encodeComponent(message)}');
+    try {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+    } catch (_) {
+      await launchUrl(uri, mode: LaunchMode.platformDefault);
+    }
+  }
+
+  // Show list of students whose validity is expiring or due for quick 1-tap WhatsApp
+  void _showBulkWhatsAppModal() {
+    final pending = _students.where((s) => s.isExpired || s.daysRemaining <= 5 || s.dueAmount > 0).toList();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        height: MediaQuery.of(context).size.height * 0.7,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.chat_rounded, color: Colors.green, size: 24),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Direct WhatsApp Reminders', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+                      Text('Direct aapke WhatsApp app se message send hoga', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    ],
+                  ),
+                ),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+              ],
+            ),
+            const Divider(height: 20),
+            if (pending.isEmpty)
+              const Expanded(
+                child: Center(
+                  child: Text('Sabhi students ka payment & validity up to date hai! 🎉', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              )
+            else
+              Expanded(
+                child: ListView.builder(
+                  itemCount: pending.length,
+                  itemBuilder: (context, idx) {
+                    final s = pending[idx];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      elevation: 1,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: s.isExpired ? Colors.red.shade100 : Colors.indigo.shade100,
+                          child: Text(s.seatNumber, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: s.isExpired ? Colors.red : Colors.indigo)),
+                        ),
+                        title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        subtitle: Text(
+                          s.isExpired ? '⚠️ Expired • Mobile: ${s.phone}' : 'Due: ₹${s.dueAmount.toInt()} • ${s.daysRemaining}d left',
+                          style: TextStyle(color: s.isExpired ? Colors.red : Colors.grey.shade700, fontSize: 12),
+                        ),
+                        trailing: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, elevation: 0),
+                          onPressed: () {
+                            _openWhatsAppDirect(s);
+                          },
+                          icon: const Icon(Icons.send_rounded, size: 14),
+                          label: const Text('Send WA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _saveUpiSettings(String newUpi, String newName) async {
@@ -335,18 +449,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return _students.fold(0, (sum, s) => sum + s.dueAmount);
   }
 
-  Future<void> _sendBulkExpiryAlerts() async {
-    final res = await ApiService.sendExpiryNotifications();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(res['message'] ?? 'Notifications dispatched!'),
-          backgroundColor: Colors.indigo.shade700,
-        ),
-      );
-    }
-  }
-
   Future<void> _deleteStudent(Student student) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -417,7 +519,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Title
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -903,9 +1004,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             onPressed: _showUpiSettingsDialog,
           ),
           IconButton(
-            tooltip: 'Send Expiry WhatsApp Alerts',
-            icon: const Icon(Icons.notification_important_rounded),
-            onPressed: _sendBulkExpiryAlerts,
+            tooltip: 'Direct WhatsApp Reminders',
+            icon: const Icon(Icons.chat_rounded),
+            onPressed: _showBulkWhatsAppModal,
           ),
           IconButton(
             tooltip: 'Refresh',
@@ -1330,7 +1431,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                         ),
                                         const SizedBox(width: 6),
 
-                                        // Validity & WhatsApp/Delete
+                                        // Validity & WhatsApp Action
                                         Column(
                                           crossAxisAlignment: CrossAxisAlignment.end,
                                           children: [
@@ -1357,18 +1458,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 IconButton(
-                                                  icon: const Icon(Icons.chat_rounded, color: Colors.green, size: 20),
+                                                  icon: const Icon(Icons.chat_rounded, color: Colors.green, size: 22),
                                                   padding: EdgeInsets.zero,
                                                   constraints: const BoxConstraints(),
-                                                  tooltip: 'WhatsApp Reminder',
-                                                  onPressed: () {
-                                                    ScaffoldMessenger.of(context).showSnackBar(
-                                                      SnackBar(
-                                                        content: Text('WhatsApp reminder sent to ${s.name} (${s.phone})!'),
-                                                        backgroundColor: Colors.green.shade700,
-                                                      ),
-                                                    );
-                                                  },
+                                                  tooltip: 'Direct WhatsApp Reminder',
+                                                  onPressed: () => _openWhatsAppDirect(s),
                                                 ),
                                                 const SizedBox(width: 8),
                                                 IconButton(
@@ -1683,9 +1777,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('WhatsApp message sent to ${student.name}!'), backgroundColor: Colors.green),
-                      );
+                      _openWhatsAppDirect(student);
                     },
                     icon: const Icon(Icons.chat_rounded, size: 18),
                     label: const Text('WhatsApp'),
