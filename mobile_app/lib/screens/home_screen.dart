@@ -1177,6 +1177,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         elevation: 0,
         actions: [
           IconButton(
+            tooltip: 'Invite Friends to use MyLibbook',
+            icon: const Icon(Icons.share_rounded),
+            onPressed: () {
+              Navigator.pushNamed(context, '/settings');
+            },
+          ),
+          IconButton(
             tooltip: 'Settings',
             icon: const Icon(Icons.settings_outlined),
             onPressed: () async {

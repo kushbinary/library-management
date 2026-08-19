@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/settings_manager.dart';
@@ -14,6 +15,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _settings = SettingsManager();
   String _currentUser = 'kushbinary';
   String? _currentPin;
+
+  static const String apkDownloadUrl = 'https://kushbinary.github.io/library-management/MyLibbook.apk';
+  static const String webAppUrl = 'https://kushbinary.github.io/library-management/';
 
   @override
   void initState() {
@@ -230,6 +234,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _shareViaWhatsApp() async {
+    const inviteMessage = 
+        'Namaste! 🙏\n\n'
+        'Kya aap bhi apni Library ko Smart aur Digital banana chahte hain?\n\n'
+        'Try *MyLibbook - Smart Library Management App* 📚✨\n\n'
+        '🔥 *Key Features:*\n'
+        '✅ Live Seat Matrix & Seat Arrangement\n'
+        '✅ 1-Tap Direct WhatsApp Fee & Renewal Reminders\n'
+        '✅ Dynamic UPI QR Code for Instant Fee Collection\n'
+        '✅ 4-Digit Quick PIN Keypad Security\n'
+        '✅ Monthly Earnings & Due Fee Tracking\n\n'
+        '📲 *Download Android APK:*\n'
+        '$apkDownloadUrl\n\n'
+        '🌐 *Web Portal:*\n'
+        '$webAppUrl\n\n'
+        'Aaj hi download karein aur library management asaan banayein! 🚀';
+
+    final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(inviteMessage)}');
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
+  void _copyInviteLink() {
+    Clipboard.setData(const ClipboardData(text: apkDownloadUrl));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(_settings.isHindi ? '📋 Invite link clipboard par copy ho gaya!' : '📋 Invite link copied to clipboard!'),
+        backgroundColor: Colors.green.shade700,
+      ),
+    );
+  }
+
   void _openSupportWhatsApp() async {
     const phone = '919838147651';
     final msg = Uri.encodeComponent('Namaste! Mujhe MyLibbook Application ke baare mein sahayata chahiye.');
@@ -257,6 +294,114 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         children: [
+          // 0. INVITE FRIENDS TO USE MYLIBBOOK (FEATURED BANNER)
+          _buildSectionHeader(isHi ? 'दोस्तों को आमंत्रित करें' : 'Invite Friends', Icons.card_giftcard_rounded),
+          Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF4338CA),
+                  Color(0xFF312E81),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF4338CA).withValues(alpha: 0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.share_rounded, color: Colors.amberAccent, size: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isHi ? 'Invite Friends to use MyLibbook' : 'Invite Friends to use MyLibbook',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              isHi
+                                  ? 'Apne dosto aur library sanchalako ke sath MyLibbook share karein'
+                                  : 'Share MyLibbook with other library owners & friends',
+                              style: const TextStyle(color: Colors.white70, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 6,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: _shareViaWhatsApp,
+                          icon: const Icon(Icons.chat_rounded, size: 16),
+                          label: Text(
+                            isHi ? 'WhatsApp par Share' : 'Invite via WhatsApp',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 4,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Colors.white54),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: _copyInviteLink,
+                          icon: const Icon(Icons.copy_rounded, size: 14),
+                          label: Text(
+                            isHi ? 'Copy Link' : 'Copy Link',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
           // 1. APP LOCK & 4-DIGIT PIN SECTION
           _buildSectionHeader(isHi ? 'सुरक्षा एवं 4-Digit App Lock' : 'Security & 4-Digit App Lock', Icons.lock_clock_rounded),
           Card(
