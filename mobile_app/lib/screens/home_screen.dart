@@ -22,6 +22,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   late TabController _tabController;
 
   List<String> _seatList = [];
+  String _upiId = 'kushbinary@okaxis';
+  String _businessName = 'Library Hub';
 
   final List<String> _timingOptions = [
     'Morning (8 AM - 12 PM)',
@@ -48,7 +50,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Future<void> _initUserAndLoad() async {
     final prefs = await SharedPreferences.getInstance();
     final user = prefs.getString('current_logged_in_user') ?? 'kushbinary';
-    setState(() => _currentUser = user);
+    final upi = prefs.getString('library_custom_upi_id') ?? 'kushbinary@okaxis';
+    final bName = prefs.getString('library_custom_business_name') ?? 'Library Hub';
+    setState(() {
+      _currentUser = user;
+      _upiId = upi;
+      _businessName = bName;
+    });
     await _loadCustomSeats();
     await _loadStudents();
   }
@@ -60,6 +68,192 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       _students = data;
       _isLoading = false;
     });
+  }
+
+  Future<void> _saveUpiSettings(String newUpi, String newName) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('library_custom_upi_id', newUpi);
+    await prefs.setString('library_custom_business_name', newName);
+    setState(() {
+      _upiId = newUpi;
+      _businessName = newName;
+    });
+  }
+
+  String _getUpiQrUrl(double amount, String studentName) {
+    final encodedName = Uri.encodeComponent(_businessName);
+    final note = Uri.encodeComponent('Library Fee - $studentName');
+    final upiPayload = 'upi://pay?pa=$_upiId&pn=$encodedName&am=${amount.toInt()}&cu=INR&tn=$note';
+    return 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${Uri.encodeComponent(upiPayload)}';
+  }
+
+  void _showUpiSettingsDialog() {
+    final upiCtrl = TextEditingController(text: _upiId);
+    final nameCtrl = TextEditingController(text: _businessName);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.qr_code_2_rounded, color: Color(0xFF4338CA)),
+            SizedBox(width: 8),
+            Text('UPI Payment Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Apni UPI ID enter karein jisme fees QR code se receive karni hai:', style: TextStyle(fontSize: 12, color: Colors.black87)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: upiCtrl,
+              decoration: InputDecoration(
+                labelText: 'UPI ID (VPA)',
+                hintText: 'e.g. 9838127461@paytm, user@okaxis',
+                prefixIcon: const Icon(Icons.payment_rounded, size: 18),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: nameCtrl,
+              decoration: InputDecoration(
+                labelText: 'Library / Business Name',
+                hintText: 'e.g. Kush Library',
+                prefixIcon: const Icon(Icons.storefront_rounded, size: 18),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4338CA), foregroundColor: Colors.white),
+            onPressed: () async {
+              if (upiCtrl.text.trim().isNotEmpty) {
+                await _saveUpiSettings(upiCtrl.text.trim(), nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : 'Library Hub');
+                Navigator.pop(ctx);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('✅ UPI ID successfully updated!'), backgroundColor: Colors.green),
+                  );
+                }
+              }
+            },
+            child: const Text('Save UPI Settings'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showQrCodeModal(double amount, String studentName) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Scan & Pay via UPI', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                    Text('Payee: $_businessName', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                  ],
+                ),
+                IconButton(icon: const Icon(Icons.settings_outlined), onPressed: () {
+                  Navigator.pop(ctx);
+                  _showUpiSettingsDialog();
+                }, tooltip: 'Change UPI ID'),
+              ],
+            ),
+            const Divider(height: 20),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.green.shade300),
+              ),
+              child: Text(
+                'Amount to Pay: ₹${amount.toInt()}',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.green.shade900),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4)),
+                ],
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Image.network(
+                _getUpiQrUrl(amount, studentName),
+                width: 200,
+                height: 200,
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const SizedBox(
+                    width: 200,
+                    height: 200,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return const SizedBox(
+                    width: 200,
+                    height: 200,
+                    child: Center(child: Text('QR Code Loading...')),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(8)),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.account_balance_wallet_outlined, size: 16, color: Colors.black87),
+                  const SizedBox(width: 6),
+                  Text('UPI ID: $_upiId', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Accepts Google Pay, PhonePe, Paytm, BHIM & Any UPI App',
+              style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4338CA), foregroundColor: Colors.white),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Done / Payment Received'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _loadCustomSeats() async {
@@ -241,7 +435,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Edit Student: ${s.name}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                              Text('Edit: ${s.name}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
                               Text('Seat: ${s.seatNumber} • Timing: ${s.timing}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                             ],
                           ),
@@ -292,25 +486,49 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         ),
                         if (curDue > 0) ...[
                           const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 40,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.amber.shade700,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 6,
+                                child: SizedBox(
+                                  height: 38,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.amber.shade700,
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    onPressed: () {
+                                      setModalState(() {
+                                        paidAmountCtrl.text = curTot.toInt().toString();
+                                        additionalPaidCtrl.text = curDue.toInt().toString();
+                                      });
+                                    },
+                                    icon: const Icon(Icons.flash_on_rounded, size: 16),
+                                    label: Text('1-Tap: Clear ₹${curDue.toInt()} Due', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
                               ),
-                              onPressed: () {
-                                setModalState(() {
-                                  paidAmountCtrl.text = curTot.toInt().toString();
-                                  additionalPaidCtrl.text = curDue.toInt().toString();
-                                });
-                              },
-                              icon: const Icon(Icons.flash_on_rounded, size: 18),
-                              label: Text('⚡ 1-Tap: Collect Remaining ₹${curDue.toInt()} (पूरा जमा)', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                            ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                flex: 4,
+                                child: SizedBox(
+                                  height: 38,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF4338CA),
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    onPressed: () => _showQrCodeModal(curDue, s.name),
+                                    icon: const Icon(Icons.qr_code_rounded, size: 16),
+                                    label: const Text('Show QR', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ],
@@ -333,6 +551,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       labelText: 'Collect Extra Payment (अतिरिक्त जमा राशि ₹)',
                       hintText: 'e.g. 500',
                       prefixIcon: const Icon(Icons.add_card_rounded, color: Colors.teal),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.qr_code_2_rounded, color: Color(0xFF4338CA)),
+                        tooltip: 'Show QR Code for this amount',
+                        onPressed: () {
+                          final addAmt = double.tryParse(additionalPaidCtrl.text.trim()) ?? curDue;
+                          if (addAmt > 0) _showQrCodeModal(addAmt, s.name);
+                        },
+                      ),
                       filled: true,
                       fillColor: const Color(0xFFF8FAFC),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -672,6 +898,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         elevation: 0,
         actions: [
           IconButton(
+            tooltip: 'UPI QR Settings',
+            icon: const Icon(Icons.qr_code_2_rounded),
+            onPressed: _showUpiSettingsDialog,
+          ),
+          IconButton(
             tooltip: 'Send Expiry WhatsApp Alerts',
             icon: const Icon(Icons.notification_important_rounded),
             onPressed: _sendBulkExpiryAlerts,
@@ -926,7 +1157,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ),
 
-        // 3. Students List with Clickable Cards & Edit Button
+        // 3. Students List
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
@@ -1155,7 +1386,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                     ),
                                     const SizedBox(height: 8),
 
-                                    // PROMINENT EDIT & COLLECT FEE ACTION BAR
+                                    // PROMINENT EDIT & COLLECT FEE ACTION BAR WITH QR BUTTON
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                       decoration: BoxDecoration(
@@ -1175,22 +1406,36 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                               color: s.dueAmount > 0 ? Colors.amber.shade900 : Colors.green.shade800,
                                             ),
                                           ),
-                                          ElevatedButton.icon(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(0xFF4338CA),
-                                              foregroundColor: Colors.white,
-                                              elevation: 0,
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                              minimumSize: Size.zero,
-                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                            ),
-                                            onPressed: () => _showEditStudentModal(s),
-                                            icon: const Icon(Icons.edit_note_rounded, size: 16),
-                                            label: Text(
-                                              s.dueAmount > 0 ? 'Edit / फीस जमा करें' : 'Edit Details',
-                                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                                            ),
+                                          Row(
+                                            children: [
+                                              if (s.dueAmount > 0) ...[
+                                                IconButton(
+                                                  icon: const Icon(Icons.qr_code_2_rounded, color: Color(0xFF4338CA), size: 22),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(),
+                                                  tooltip: 'Show UPI QR Code to Student',
+                                                  onPressed: () => _showQrCodeModal(s.dueAmount, s.name),
+                                                ),
+                                                const SizedBox(width: 8),
+                                              ],
+                                              ElevatedButton.icon(
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: const Color(0xFF4338CA),
+                                                  foregroundColor: Colors.white,
+                                                  elevation: 0,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                  minimumSize: Size.zero,
+                                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                ),
+                                                onPressed: () => _showEditStudentModal(s),
+                                                icon: const Icon(Icons.edit_note_rounded, size: 16),
+                                                label: Text(
+                                                  s.dueAmount > 0 ? 'Edit / फीस जमा करें' : 'Edit Details',
+                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ],
                                       ),
@@ -1208,7 +1453,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  // ================= TAB 2: LIVE SEAT MATRIX WITH EDIT LAYOUT OPTION =================
+  // ================= TAB 2: LIVE SEAT MATRIX =================
   Widget _buildSeatMapTab() {
     final seatMap = _occupiedSeatsMap;
     final allSeats = _allSeatNumbers;
@@ -1218,7 +1463,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Seat Legend Banner + Edit Layout Button
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -1410,6 +1654,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             const SizedBox(height: 16),
             Row(
               children: [
+                if (student.dueAmount > 0) ...[
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _showQrCodeModal(student.dueAmount, student.name);
+                      },
+                      icon: const Icon(Icons.qr_code_rounded, size: 18),
+                      label: const Text('UPI QR'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
@@ -1417,7 +1674,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       _showEditStudentModal(student);
                     },
                     icon: const Icon(Icons.edit_note_rounded, size: 18),
-                    label: const Text('Edit / फीस जमा करें'),
+                    label: const Text('Edit / Fees'),
                     style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4338CA), foregroundColor: Colors.white),
                   ),
                 ),
