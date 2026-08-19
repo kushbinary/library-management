@@ -11,7 +11,13 @@ class ApiService {
   static Future<String> getBaseUrl() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getString('custom_server_api_url') ?? defaultBaseUrl;
+      final custom = prefs.getString('custom_server_api_url');
+      if (custom != null && custom.isNotEmpty && !custom.contains('k8m.onrender.com')) {
+        return custom;
+      }
+      // If old or invalid URL found, reset to current defaultBaseUrl
+      await prefs.setString('custom_server_api_url', defaultBaseUrl);
+      return defaultBaseUrl;
     } catch (_) {
       return defaultBaseUrl;
     }
