@@ -31,6 +31,9 @@ db = SQLAlchemy(app)
 
 # ==================== Database Models ====================
 
+# Library settings - total seat capacity
+LIBRARY_CONFIG = {'total_seats': 50}  # Adjust as needed
+
 class Student(db.Model):
     __tablename__ = 'students'
 
@@ -55,8 +58,15 @@ class Student(db.Model):
             'seat_number': self.seat_number,
             'expiry_date': self.expiry_date.strftime('%Y-%m-%d') if self.expiry_date else None,
             'days_remaining': self.days_remaining(),
-            'is_expired': self.is_expired()
+            'is_expired': self.is_expired(),
+            'seat_status': self.get_seat_status()
         }
+
+    def get_seat_status(self):
+        """Returns seat availability status"""
+        filled_seats = len(Student.query.all())
+        total = LIBRARY_CONFIG['total_seats']
+        return {'filled': filled_seats, 'total': total, 'available': total - filled_seats}
 
     def days_remaining(self):
         if self.expiry_date:
