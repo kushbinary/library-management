@@ -17,11 +17,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   List<Student> _students = [];
   bool _isLoading = true;
   String _searchQuery = '';
-  String _filter = 'All'; // All, Active, Due Fees, Expiring, Expired
+  String _filter = 'All';
   String _currentUser = 'kushbinary';
   late TabController _tabController;
 
-  // Custom Editable Seat Layout List
   List<String> _seatList = [];
 
   final List<String> _timingOptions = [
@@ -63,7 +62,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     });
   }
 
-  // Load custom seat names from SharedPreferences or default standard list
   Future<void> _loadCustomSeats() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -78,7 +76,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       }
     } catch (_) {}
 
-    // Default numeric 01..40 + alpha A-01..A-10 format
     final defaultSeats = <String>[];
     for (int i = 1; i <= 30; i++) {
       defaultSeats.add(i.toString().padLeft(2, '0'));
@@ -95,7 +92,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     } catch (_) {}
   }
 
-  // Merge predefined seats with any custom seat numbers assigned to students
   List<String> get _allSeatNumbers {
     final set = <String>{};
     for (var s in _seatList) {
@@ -227,7 +223,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Modal Title Bar
+                  // Title
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -239,14 +235,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               color: const Color(0xFFE0E7FF),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(Icons.edit_note_rounded, color: Color(0xFF4338CA), size: 22),
+                            child: const Icon(Icons.edit_note_rounded, color: Color(0xFF4338CA), size: 24),
                           ),
                           const SizedBox(width: 10),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Edit Student & Fee', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
-                              Text('${s.name} • Seat: ${s.seatNumber}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                              Text('Edit Student: ${s.name}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                              Text('Seat: ${s.seatNumber} • Timing: ${s.timing}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                             ],
                           ),
                         ],
@@ -259,7 +255,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ),
                   const Divider(height: 20),
 
-                  // 1. Fee Collection / Due Status Box
+                  // Fee Summary Box
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
@@ -295,10 +291,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           ],
                         ),
                         if (curDue > 0) ...[
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 12),
                           SizedBox(
                             width: double.infinity,
-                            height: 38,
+                            height: 40,
                             child: ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.amber.shade700,
@@ -312,8 +308,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   additionalPaidCtrl.text = curDue.toInt().toString();
                                 });
                               },
-                              icon: const Icon(Icons.flash_on_rounded, size: 16),
-                              label: Text('1-Tap: Collect Remaining ₹${curDue.toInt()} (पूरा जमा करें)', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              icon: const Icon(Icons.flash_on_rounded, size: 18),
+                              label: Text('⚡ 1-Tap: Collect Remaining ₹${curDue.toInt()} (पूरा जमा)', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                             ),
                           ),
                         ],
@@ -322,7 +318,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ),
                   const SizedBox(height: 14),
 
-                  // 2. Extra Payment Input
+                  // Collect Extra Fee Input
                   TextField(
                     controller: additionalPaidCtrl,
                     keyboardType: TextInputType.number,
@@ -334,7 +330,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       });
                     },
                     decoration: InputDecoration(
-                      labelText: 'Collect Extra Fee (अतिरिक्त जमा राशि ₹)',
+                      labelText: 'Collect Extra Payment (अतिरिक्त जमा राशि ₹)',
                       hintText: 'e.g. 500',
                       prefixIcon: const Icon(Icons.add_card_rounded, color: Colors.teal),
                       filled: true,
@@ -344,7 +340,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ),
                   const SizedBox(height: 12),
 
-                  // 3. Edit Student Details (Name, Phone, Seat, Timing)
+                  // Student Name & Mobile
                   Row(
                     children: [
                       Expanded(
@@ -377,6 +373,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ),
                   const SizedBox(height: 12),
 
+                  // Seat & Timing
                   Row(
                     children: [
                       Expanded(
@@ -417,7 +414,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ),
                   const SizedBox(height: 12),
 
-                  // 4. Validity Date Picker
+                  // Expiry Date
                   Row(
                     children: [
                       Expanded(
@@ -440,7 +437,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
                       const SizedBox(width: 8),
                       ActionChip(
-                        label: const Text('+30 Days', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                        label: const Text('+30 Days Renewal', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                         backgroundColor: Colors.indigo.shade50,
                         onPressed: () {
                           setModalState(() {
@@ -452,7 +449,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ),
                   const SizedBox(height: 20),
 
-                  // Save & Update Button
+                  // Save Button
                   SizedBox(
                     width: double.infinity,
                     height: 48,
@@ -514,7 +511,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   // ================= 2. SEAT ARRANGEMENT & SEAT NAME EDIT MODAL =================
   void _showEditSeatsLayoutModal() {
     final seatCountCtrl = TextEditingController(text: _seatList.length.toString());
-    String formatType = 'Numeric (01, 02, 03...)'; // or 'Alpha (A-01, A-02...)', 'Custom'
+    String formatType = 'Numeric (01, 02, 03...)';
     final customSeatsCtrl = TextEditingController(text: _seatList.join(', '));
 
     showDialog(
@@ -610,7 +607,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     newSeats.add('S-${i.toString().padLeft(2, '0')}');
                   }
                 } else {
-                  // Numeric 01, 02, 03
                   final count = int.tryParse(seatCountCtrl.text.trim()) ?? 40;
                   for (int i = 1; i <= count; i++) {
                     newSeats.add(i.toString().padLeft(2, '0'));
@@ -761,7 +757,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
               Row(
                 children: [
-                  // Earnings Card
                   Expanded(
                     flex: 6,
                     child: Container(
@@ -814,7 +809,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Seat Quick Overview Card
                   Expanded(
                     flex: 5,
                     child: Container(
@@ -962,216 +956,244 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         itemBuilder: (context, idx) {
                           final s = _filteredStudents[idx];
                           return Card(
-                            margin: const EdgeInsets.only(bottom: 10),
+                            margin: const EdgeInsets.only(bottom: 12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                               side: BorderSide(
                                 color: s.isExpired
                                     ? Colors.red.shade300
                                     : (s.dueAmount > 0 ? Colors.amber.shade400 : Colors.indigo.shade100),
-                                width: 1.3,
+                                width: 1.4,
                               ),
                             ),
-                            elevation: 2.5,
+                            elevation: 3,
                             color: Colors.white,
                             child: InkWell(
                               borderRadius: BorderRadius.circular(16),
                               onTap: () => _showEditStudentModal(s),
                               child: Padding(
                                 padding: const EdgeInsets.all(12),
-                                child: Row(
+                                child: Column(
                                   children: [
-                                    // Seat Badge with gradient
-                                    Container(
-                                      width: 52,
-                                      height: 52,
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                          colors: s.isExpired
-                                              ? [Colors.red.shade600, Colors.red.shade800]
-                                              : [const Color(0xFF4F46E5), const Color(0xFF3730A3)],
-                                        ),
-                                        borderRadius: BorderRadius.circular(14),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: (s.isExpired ? Colors.red : Colors.indigo).withValues(alpha: 0.3),
-                                            blurRadius: 6,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          const Text(
-                                            'SEAT',
-                                            style: TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.w600),
-                                          ),
-                                          Text(
-                                            s.seatNumber.isNotEmpty ? s.seatNumber : '?',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w900,
-                                              fontSize: 14,
+                                    Row(
+                                      children: [
+                                        // Seat Badge
+                                        Container(
+                                          width: 50,
+                                          height: 50,
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: s.isExpired
+                                                  ? [Colors.red.shade600, Colors.red.shade800]
+                                                  : [const Color(0xFF4F46E5), const Color(0xFF3730A3)],
                                             ),
+                                            borderRadius: BorderRadius.circular(14),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: (s.isExpired ? Colors.red : Colors.indigo).withValues(alpha: 0.3),
+                                                blurRadius: 6,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ],
                                           ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-
-                                    // Student Details with Highlighted Name
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
                                             children: [
-                                              Expanded(
-                                                child: Text(
-                                                  s.name,
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.w900,
-                                                    fontSize: 17,
-                                                    color: s.isExpired ? Colors.red.shade900 : const Color(0xFF1E1B4B),
-                                                    letterSpacing: 0.2,
-                                                  ),
-                                                  overflow: TextOverflow.ellipsis,
+                                              const Text(
+                                                'SEAT',
+                                                style: TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.w600),
+                                              ),
+                                              Text(
+                                                s.seatNumber.isNotEmpty ? s.seatNumber : '?',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w900,
+                                                  fontSize: 14,
                                                 ),
                                               ),
-                                              // Due / Paid Badge with Edit Hint
-                                              InkWell(
-                                                onTap: () => _showEditStudentModal(s),
-                                                child: Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                                  decoration: BoxDecoration(
-                                                    color: s.dueAmount > 0 ? Colors.amber.shade100 : Colors.green.shade100,
-                                                    borderRadius: BorderRadius.circular(6),
-                                                    border: Border.all(
-                                                      color: s.dueAmount > 0 ? Colors.amber.shade400 : Colors.green.shade300,
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+
+                                        // Student Info
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: Text(
+                                                      s.name,
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.w900,
+                                                        fontSize: 17,
+                                                        color: s.isExpired ? Colors.red.shade900 : const Color(0xFF1E1B4B),
+                                                        letterSpacing: 0.2,
+                                                      ),
+                                                      overflow: TextOverflow.ellipsis,
                                                     ),
                                                   ),
-                                                  child: Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Text(
-                                                        s.dueAmount > 0
-                                                            ? 'Due: ₹${s.dueAmount.toInt()}'
-                                                            : 'Paid: ₹${s.paidAmount.toInt()}',
-                                                        style: TextStyle(
-                                                          color: s.dueAmount > 0 ? Colors.amber.shade900 : Colors.green.shade900,
-                                                          fontSize: 11,
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
+                                                  // Due / Paid Badge
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                                    decoration: BoxDecoration(
+                                                      color: s.dueAmount > 0 ? Colors.amber.shade100 : Colors.green.shade100,
+                                                      borderRadius: BorderRadius.circular(6),
+                                                      border: Border.all(
+                                                        color: s.dueAmount > 0 ? Colors.amber.shade400 : Colors.green.shade300,
                                                       ),
-                                                      const SizedBox(width: 3),
-                                                      Icon(Icons.edit, size: 10, color: s.dueAmount > 0 ? Colors.amber.shade900 : Colors.green.shade900),
-                                                    ],
+                                                    ),
+                                                    child: Text(
+                                                      s.dueAmount > 0
+                                                          ? 'Due: ₹${s.dueAmount.toInt()}'
+                                                          : 'Paid: ₹${s.paidAmount.toInt()}',
+                                                      style: TextStyle(
+                                                        color: s.dueAmount > 0 ? Colors.amber.shade900 : Colors.green.shade900,
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 4),
+
+                                              Row(
+                                                children: [
+                                                  Icon(Icons.phone_android_rounded, size: 13, color: Colors.indigo.shade600),
+                                                  const SizedBox(width: 3),
+                                                  Text(
+                                                    s.phone,
+                                                    style: TextStyle(color: Colors.grey.shade800, fontSize: 12, fontWeight: FontWeight.w600),
+                                                  ),
+                                                  const SizedBox(width: 10),
+                                                  Icon(Icons.payments_rounded, size: 13, color: Colors.teal.shade700),
+                                                  const SizedBox(width: 3),
+                                                  Text(
+                                                    s.paymentMode,
+                                                    style: TextStyle(color: Colors.teal.shade800, fontSize: 11, fontWeight: FontWeight.w600),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 2),
+
+                                              Row(
+                                                children: [
+                                                  Icon(Icons.access_time_filled_rounded, size: 13, color: Colors.grey.shade600),
+                                                  const SizedBox(width: 3),
+                                                  Expanded(
+                                                    child: Text(
+                                                      s.timing,
+                                                      style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ],
-                                          ),
-                                          const SizedBox(height: 4),
-
-                                          Row(
-                                            children: [
-                                              Icon(Icons.phone_android_rounded, size: 13, color: Colors.indigo.shade600),
-                                              const SizedBox(width: 3),
-                                              Text(
-                                                s.phone,
-                                                style: TextStyle(color: Colors.grey.shade800, fontSize: 12, fontWeight: FontWeight.w600),
-                                              ),
-                                              const SizedBox(width: 10),
-                                              Icon(Icons.payments_rounded, size: 13, color: Colors.teal.shade700),
-                                              const SizedBox(width: 3),
-                                              Text(
-                                                s.paymentMode,
-                                                style: TextStyle(color: Colors.teal.shade800, fontSize: 11, fontWeight: FontWeight.w600),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 2),
-
-                                          Row(
-                                            children: [
-                                              Icon(Icons.access_time_filled_rounded, size: 13, color: Colors.grey.shade600),
-                                              const SizedBox(width: 3),
-                                              Expanded(
-                                                child: Text(
-                                                  s.timing,
-                                                  style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-
-                                    // Action Buttons: Edit, WhatsApp, Delete
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                          decoration: BoxDecoration(
-                                            color: s.isExpired ? Colors.red.shade50 : Colors.blue.shade50,
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(
-                                              color: s.isExpired ? Colors.red.shade300 : Colors.blue.shade200,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            s.isExpired ? 'EXPIRED' : '${s.daysRemaining}d left',
-                                            style: TextStyle(
-                                              color: s.isExpired ? Colors.red.shade700 : Colors.blue.shade900,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                            ),
                                           ),
                                         ),
-                                        const SizedBox(height: 6),
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
+                                        const SizedBox(width: 6),
+
+                                        // Validity & WhatsApp/Delete
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.end,
                                           children: [
-                                            IconButton(
-                                              icon: const Icon(Icons.edit_note_rounded, color: Color(0xFF4338CA), size: 24),
-                                              padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(),
-                                              tooltip: 'Edit & Collect Fee',
-                                              onPressed: () => _showEditStudentModal(s),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: s.isExpired ? Colors.red.shade50 : Colors.blue.shade50,
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(
+                                                  color: s.isExpired ? Colors.red.shade300 : Colors.blue.shade200,
+                                                ),
+                                              ),
+                                              child: Text(
+                                                s.isExpired ? 'EXPIRED' : '${s.daysRemaining}d left',
+                                                style: TextStyle(
+                                                  color: s.isExpired ? Colors.red.shade700 : Colors.blue.shade900,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
                                             ),
-                                            const SizedBox(width: 8),
-                                            IconButton(
-                                              icon: const Icon(Icons.chat_rounded, color: Colors.green, size: 20),
-                                              padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(),
-                                              tooltip: 'WhatsApp Reminder',
-                                              onPressed: () {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text('WhatsApp receipt / reminder sent to ${s.name} (${s.phone})!'),
-                                                    backgroundColor: Colors.green.shade700,
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                            const SizedBox(width: 8),
-                                            IconButton(
-                                              icon: Icon(Icons.delete_outline_rounded, color: Colors.red.shade400, size: 20),
-                                              padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(),
-                                              tooltip: 'Delete Student',
-                                              onPressed: () => _deleteStudent(s),
+                                            const SizedBox(height: 6),
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  icon: const Icon(Icons.chat_rounded, color: Colors.green, size: 20),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(),
+                                                  tooltip: 'WhatsApp Reminder',
+                                                  onPressed: () {
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      SnackBar(
+                                                        content: Text('WhatsApp reminder sent to ${s.name} (${s.phone})!'),
+                                                        backgroundColor: Colors.green.shade700,
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                                const SizedBox(width: 8),
+                                                IconButton(
+                                                  icon: Icon(Icons.delete_outline_rounded, color: Colors.red.shade400, size: 20),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(),
+                                                  tooltip: 'Delete Student',
+                                                  onPressed: () => _deleteStudent(s),
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),
                                       ],
+                                    ),
+                                    const SizedBox(height: 8),
+
+                                    // PROMINENT EDIT & COLLECT FEE ACTION BAR
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            s.dueAmount > 0
+                                                ? '⚠️ Due Balance: ₹${s.dueAmount.toInt()}'
+                                                : '✅ Full Fees Paid',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: s.dueAmount > 0 ? Colors.amber.shade900 : Colors.green.shade800,
+                                            ),
+                                          ),
+                                          ElevatedButton.icon(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF4338CA),
+                                              foregroundColor: Colors.white,
+                                              elevation: 0,
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                              minimumSize: Size.zero,
+                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            ),
+                                            onPressed: () => _showEditStudentModal(s),
+                                            icon: const Icon(Icons.edit_note_rounded, size: 16),
+                                            label: Text(
+                                              s.dueAmount > 0 ? 'Edit / फीस जमा करें' : 'Edit Details',
+                                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -1216,7 +1238,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     _buildSeatLegendItem('भरी (Occupied)', Colors.orange.shade800, Colors.orange.shade50),
                   ],
                 ),
-                // Edit Seats Layout Button
                 OutlinedButton.icon(
                   onPressed: _showEditSeatsLayoutModal,
                   icon: const Icon(Icons.tune_rounded, size: 16, color: Color(0xFF4338CA)),
@@ -1232,7 +1253,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           const SizedBox(height: 14),
 
-          // 2. Room Overview Info
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -1248,7 +1268,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           const SizedBox(height: 10),
 
-          // 3. Dynamic Grid of Seats
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -1398,7 +1417,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       _showEditStudentModal(student);
                     },
                     icon: const Icon(Icons.edit_note_rounded, size: 18),
-                    label: const Text('Edit / Collect Fee'),
+                    label: const Text('Edit / फीस जमा करें'),
                     style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4338CA), foregroundColor: Colors.white),
                   ),
                 ),
