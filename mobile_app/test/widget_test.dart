@@ -2,8 +2,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:library_management/main.dart';
 
 void main() {
-  testWidgets('App loads LoginScreen properly', (WidgetTester tester) async {
+  testWidgets('App loads MyLibbook LoginScreen properly', (WidgetTester tester) async {
     await tester.pumpWidget(const LibraryApp());
-    expect(find.text('Library Hub'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.text('MyLibbook'), findsWidgets);
+    expect(find.text('Smart. Organized. Knowledge.'), findsOneWidget);
+    expect(find.text('Secure Login'), findsOneWidget);
   });
 }

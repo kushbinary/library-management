@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -11,7 +13,11 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final LocalAuthentication _localAuth = LocalAuthentication();
   bool _isLogin = true;
+  bool _isQuickUnlockMode = false;
+  String? _savedUsername;
+  bool _isAuthenticating = false;
 
   // Master Security Passcode required to register any new admin/staff
   static const String masterSecurityCode = "LIB@2026";
@@ -48,13 +54,91 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCustomAccounts();
+    _checkSavedSessionAndAuthenticate();
   }
 
   @override
   void dispose() {
     _lockoutTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _checkSavedSessionAndAuthenticate() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedUser = prefs.getString('current_logged_in_user');
+      final hasLoggedIn = prefs.getBool('has_logged_in_before') ?? false;
+
+      await _loadCustomAccounts();
+
+      if (hasLoggedIn && savedUser != null && savedUser.isNotEmpty) {
+        setState(() {
+          _savedUsername = savedUser;
+          _isQuickUnlockMode = true;
+        });
+
+        // Trigger Biometric / Screen Lock automatically
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _authenticateWithDeviceLock();
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _authenticateWithDeviceLock() async {
+    if (_isAuthenticating) return;
+    setState(() {
+      _isAuthenticating = true;
+      _errorMessage = null;
+    });
+
+    try {
+      if (kIsWeb) {
+        // On Web, if logged in before, unlock directly or allow 1-click
+        await Future.delayed(const Duration(milliseconds: 300));
+        _navigateToHome(_savedUsername ?? 'kushbinary');
+        return;
+      }
+
+      final canAuthenticateWithBiometrics = await _localAuth.canCheckBiometrics;
+      final canAuthenticate = canAuthenticateWithBiometrics || await _localAuth.isDeviceSupported();
+
+      if (canAuthenticate) {
+        final bool didAuthenticate = await _localAuth.authenticate(
+          localizedReason: 'Confirm screen lock pattern, PIN, or fingerprint to unlock MyLibbook',
+          options: const AuthenticationOptions(
+            biometricOnly: false, // Allows PIN, Pattern, Password as well as Biometric
+            stickyAuth: true,
+            useErrorDialogs: true,
+          ),
+        );
+
+        if (didAuthenticate) {
+          _navigateToHome(_savedUsername ?? 'kushbinary');
+          return;
+        } else {
+          setState(() {
+            _errorMessage = 'Authentication cancelled. Tap below to unlock.';
+          });
+        }
+      } else {
+        // Device does not support screen lock or biometrics, open dashboard
+        _navigateToHome(_savedUsername ?? 'kushbinary');
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Lock verification failed. Tap to retry or use password.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isAuthenticating = false);
+      }
+    }
+  }
+
+  void _navigateToHome(String username) {
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(context, '/home');
   }
 
   Future<void> _loadCustomAccounts() async {
@@ -98,7 +182,7 @@ class _LoginScreenState extends State<LoginScreen> {
               'Security Lockout: Kripya $_lockoutSeconds seconds wait karein.';
         });
       } else {
-        timer.cancel();
+        _lockoutTimer?.cancel();
         setState(() {
           _lockoutSeconds = 0;
           _failedAttempts = 0;
@@ -108,13 +192,13 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  void _handleLogin() async {
+  Future<void> _handleLogin() async {
     if (_lockoutSeconds > 0) return;
 
-    final username = _loginUserCtrl.text.trim().toLowerCase();
-    final password = _loginPassCtrl.text.trim();
+    final user = _loginUserCtrl.text.trim();
+    final pass = _loginPassCtrl.text;
 
-    if (username.isEmpty || password.isEmpty) {
+    if (user.isEmpty || pass.isEmpty) {
       setState(() => _errorMessage = 'Username aur Password enter karein.');
       return;
     }
@@ -124,82 +208,65 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
 
-    await Future.delayed(const Duration(milliseconds: 350));
+    await Future.delayed(const Duration(milliseconds: 300));
 
-    if (_registeredAccounts.containsKey(username) &&
-        _registeredAccounts[username] == password) {
+    final normalizedUser = user.toLowerCase();
+    if (_registeredAccounts.containsKey(normalizedUser) &&
+        _registeredAccounts[normalizedUser] == pass) {
       _failedAttempts = 0;
+
+      // Save persistent session for Screen Lock Auto-Unlock
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('current_logged_in_user', username);
+      await prefs.setString('current_logged_in_user', user);
+      await prefs.setBool('has_logged_in_before', true);
+
       if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.verified_user_rounded, color: Colors.white),
-                const SizedBox(width: 10),
-                Text('Secure Login Verified! Welcome $username 🎉'),
-              ],
-            ),
-            backgroundColor: Colors.green.shade700,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-        Navigator.pushReplacementNamed(context, '/home');
+        _navigateToHome(user);
       }
     } else {
-      if (mounted) {
-        _failedAttempts++;
+      _failedAttempts++;
+      if (_failedAttempts >= 5) {
+        _startLockoutTimer();
+      } else {
         setState(() {
-          _isLoading = false;
-          if (_failedAttempts >= 5) {
-            _startLockoutTimer();
-          } else {
-            _errorMessage =
-                'Access Denied: Galat Username ya Password! (${5 - _failedAttempts} attempts left)';
-          }
+          _errorMessage =
+              'Galat Username ya Password! (${5 - _failedAttempts} attempts bache hain)';
         });
       }
     }
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
   }
 
-  void _handleSignUp() async {
+  Future<void> _handleSignup() async {
     final name = _signupNameCtrl.text.trim();
-    final email = _signupEmailCtrl.text.trim().toLowerCase();
-    final secretKey = _signupSecurityKeyCtrl.text.trim();
-    final password = _signupPassCtrl.text.trim();
-    final confirmPass = _signupConfirmPassCtrl.text.trim();
+    final email = _signupEmailCtrl.text.trim();
+    final secKey = _signupSecurityKeyCtrl.text.trim();
+    final pass = _signupPassCtrl.text;
+    final confirmPass = _signupConfirmPassCtrl.text;
 
-    if (name.isEmpty || email.isEmpty || password.isEmpty || secretKey.isEmpty) {
-      setState(() => _errorMessage = 'Kripya sabhi fields bharein.');
+    if (name.isEmpty || email.isEmpty || pass.isEmpty || secKey.isEmpty) {
+      setState(() => _errorMessage = 'Sabhi fields bharna anivarya hai.');
       return;
     }
 
-    // Validate Master Security Key
-    if (secretKey != masterSecurityCode && secretKey != "Admin@1994") {
+    if (secKey != masterSecurityCode) {
       setState(() {
         _errorMessage =
-            'Unauthorized: Galat Master Security Key! Sirf authorized admin hi new staff register kar sakte hain.';
+            'Galat Master Security Key! Naye admin register karne ke liye valid Master Key enter karein.';
       });
       return;
     }
 
-    if (password.length < 6) {
-      setState(() =>
-          _errorMessage = 'Password kam se kam 6 characters ka hona chahiye.');
+    if (pass != confirmPass) {
+      setState(() => _errorMessage = 'Dono passwords match nahi kar rahe hain.');
       return;
     }
 
-    if (password != confirmPass) {
-      setState(() =>
-          _errorMessage = 'Password aur Confirm Password match nahi kar rahe!');
-      return;
-    }
-
-    if (_registeredAccounts.containsKey(email)) {
-      setState(
-          () => _errorMessage = 'Yeh Account pehle se registered hai! Login karein.');
+    if (pass.length < 6) {
+      setState(() => _errorMessage = 'Password kam se kam 6 characters ka hona chahiye.');
       return;
     }
 
@@ -209,27 +276,19 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     await Future.delayed(const Duration(milliseconds: 400));
-    await _saveCustomAccount(email, password);
+
+    final cleanUser = name.replaceAll(' ', '').toLowerCase();
+    await _saveCustomAccount(cleanUser, pass);
+    await _saveCustomAccount(email.toLowerCase(), pass);
+
+    // Save session
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('current_logged_in_user', name);
+    await prefs.setBool('has_logged_in_before', true);
 
     if (mounted) {
-      setState(() {
-        _isLoading = false;
-        _isLogin = true;
-        _loginUserCtrl.text = email;
-        _loginPassCtrl.text = password;
-        _signupSecurityKeyCtrl.clear();
-        _signupPassCtrl.clear();
-        _signupConfirmPassCtrl.clear();
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              'Authorized Account "$name" Created! Ab login kar sakte hain 🎉'),
-          backgroundColor: Colors.green.shade700,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      setState(() => _isLoading = false);
+      _navigateToHome(name);
     }
   }
 
@@ -262,406 +321,422 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(28.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Official MyLibbook Logo
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Image.asset(
-                          'assets/images/logo.png',
-                          height: 85,
-                          fit: BoxFit.contain,
-                          errorBuilder: (ctx, err, stack) => Icon(
-                            Icons.menu_book_rounded,
-                            size: 60,
-                            color: const Color(0xFF1E3A8A),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'MyLibbook',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          color: const Color(0xFF0F172A),
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const Text(
-                        'Smart. Organized. Knowledge.',
-                        style: TextStyle(
-                          color: Color(0xFF0284C7),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Segmented Button Toggle for Login / Sign Up
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        padding: const EdgeInsets.all(4),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: _lockoutSeconds > 0
-                                    ? null
-                                    : () => setState(() {
-                                          _isLogin = true;
-                                          _errorMessage = null;
-                                        }),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: _isLogin ? Colors.white : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(10),
-                                    boxShadow: _isLogin
-                                        ? [
-                                            BoxShadow(
-                                              color: Colors.black.withValues(alpha: 0.08),
-                                              blurRadius: 4,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ]
-                                        : null,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      'Secure Login',
-                                      style: TextStyle(
-                                        fontWeight:
-                                            _isLogin ? FontWeight.bold : FontWeight.normal,
-                                        color: _isLogin
-                                            ? Colors.deepPurple.shade800
-                                            : Colors.grey.shade700,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: _lockoutSeconds > 0
-                                    ? null
-                                    : () => setState(() {
-                                          _isLogin = false;
-                                          _errorMessage = null;
-                                        }),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: !_isLogin ? Colors.white : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(10),
-                                    boxShadow: !_isLogin
-                                        ? [
-                                            BoxShadow(
-                                              color: Colors.black.withValues(alpha: 0.08),
-                                              blurRadius: 4,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ]
-                                        : null,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      'Register Staff',
-                                      style: TextStyle(
-                                        fontWeight:
-                                            !_isLogin ? FontWeight.bold : FontWeight.normal,
-                                        color: !_isLogin
-                                            ? Colors.deepPurple.shade800
-                                            : Colors.grey.shade700,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Error / Warning Message Box
-                      if (_errorMessage != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            color: _lockoutSeconds > 0
-                                ? Colors.orange.shade50
-                                : Colors.red.shade50,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _lockoutSeconds > 0
-                                  ? Colors.orange.shade300
-                                  : Colors.red.shade300,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _lockoutSeconds > 0
-                                    ? Icons.timer_outlined
-                                    : Icons.gpp_bad_outlined,
-                                color: _lockoutSeconds > 0
-                                    ? Colors.orange.shade900
-                                    : Colors.red.shade700,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _errorMessage!,
-                                  style: TextStyle(
-                                    color: _lockoutSeconds > 0
-                                        ? Colors.orange.shade900
-                                        : Colors.red.shade900,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                      // FORMS
-                      if (_isLogin) ...[
-                        // SECURE LOGIN FORM
-                        TextField(
-                          controller: _loginUserCtrl,
-                          enabled: _lockoutSeconds == 0,
-                          decoration: InputDecoration(
-                            labelText: 'Username or Email',
-                            prefixIcon: const Icon(Icons.account_circle_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        TextField(
-                          controller: _loginPassCtrl,
-                          obscureText: _obscureLoginPass,
-                          enabled: _lockoutSeconds == 0,
-                          onSubmitted: (_) => _handleLogin(),
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            prefixIcon: const Icon(Icons.password_rounded),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscureLoginPass
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscureLoginPass = !_obscureLoginPass;
-                                });
-                              },
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed:
-                                (_isLoading || _lockoutSeconds > 0) ? null : _handleLogin,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.deepPurple.shade700,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              elevation: 2,
-                            ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(Icons.lock_open_rounded, size: 20),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        _lockoutSeconds > 0
-                                            ? 'Locked ($_lockoutSeconds s)'
-                                            : 'Authenticate & Enter',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                      ] else ...[
-                        // RESTRICTED SIGN UP FORM (REQUIRES MASTER SECURITY KEY)
-                        TextField(
-                          controller: _signupNameCtrl,
-                          decoration: InputDecoration(
-                            labelText: 'Staff / Admin Full Name',
-                            prefixIcon: const Icon(Icons.badge_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _signupEmailCtrl,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: InputDecoration(
-                            labelText: 'Username or Email',
-                            prefixIcon: const Icon(Icons.alternate_email),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        // Master Passcode Field
-                        TextField(
-                          controller: _signupSecurityKeyCtrl,
-                          obscureText: _obscureSecurityKey,
-                          decoration: InputDecoration(
-                            labelText: 'Master Security Key (Secret PIN)',
-                            hintText: 'Required to authorize new staff',
-                            prefixIcon: const Icon(Icons.vpn_key_outlined),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscureSecurityKey
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscureSecurityKey = !_obscureSecurityKey;
-                                });
-                              },
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _signupPassCtrl,
-                          obscureText: _obscureSignupPass,
-                          decoration: InputDecoration(
-                            labelText: 'Create Password (min 6 chars)',
-                            prefixIcon: const Icon(Icons.lock_outline_rounded),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscureSignupPass
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscureSignupPass = !_obscureSignupPass;
-                                });
-                              },
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _signupConfirmPassCtrl,
-                          obscureText: _obscureSignupConfirmPass,
-                          decoration: InputDecoration(
-                            labelText: 'Confirm Password',
-                            prefixIcon: const Icon(Icons.check_circle_outline),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscureSignupConfirmPass
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscureSignupConfirmPass =
-                                      !_obscureSignupConfirmPass;
-                                });
-                              },
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _handleSignUp,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.deepPurple.shade700,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              elevation: 2,
-                            ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.how_to_reg_rounded, size: 20),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Authorize & Create Account',
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                  child: _isQuickUnlockMode ? _buildQuickUnlockView(theme) : _buildPasswordLoginView(theme),
                 ),
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  // ================= 1. QUICK UNLOCK WITH SCREEN LOCK / BIOMETRICS =================
+  Widget _buildQuickUnlockView(ThemeData theme) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Official MyLibbook Logo
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.asset(
+            'assets/images/logo.png',
+            height: 85,
+            fit: BoxFit.contain,
+            errorBuilder: (ctx, err, stack) => const Icon(
+              Icons.menu_book_rounded,
+              size: 60,
+              color: Color(0xFF1E3A8A),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'MyLibbook',
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: const Color(0xFF0F172A),
+            letterSpacing: 0.5,
+          ),
+        ),
+        const Text(
+          'Smart. Organized. Knowledge.',
+          style: TextStyle(
+            color: Color(0xFF0284C7),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.3,
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // User Avatar Badge
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE0E7FF),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.account_circle_rounded, color: Color(0xFF4338CA), size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Welcome, ${_savedUsername ?? "Admin"}',
+                style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF312E81), fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        Text(
+          'Confirm your screen lock pattern, PIN, or password to unlock MyLibbook',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.grey.shade700, fontSize: 13, height: 1.3),
+        ),
+        const SizedBox(height: 20),
+
+        if (_errorMessage != null) ...[
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.red.shade200),
+            ),
+            child: Text(
+              _errorMessage!,
+              style: TextStyle(color: Colors.red.shade800, fontSize: 12, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // Big Unlock Button
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4338CA),
+              foregroundColor: Colors.white,
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            onPressed: _authenticateWithDeviceLock,
+            icon: _isAuthenticating
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.fingerprint_rounded, size: 24),
+            label: Text(
+              _isAuthenticating ? 'Verifying...' : 'Unlock MyLibbook',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Option to switch account / enter password manually
+        TextButton.icon(
+          onPressed: () {
+            setState(() {
+              _isQuickUnlockMode = false;
+              _errorMessage = null;
+            });
+          },
+          icon: const Icon(Icons.key_rounded, size: 16),
+          label: const Text('Login with Password / Switch Account', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        ),
+      ],
+    );
+  }
+
+  // ================= 2. PASSWORD LOGIN / SIGN UP VIEW =================
+  Widget _buildPasswordLoginView(ThemeData theme) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Official MyLibbook Logo
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.asset(
+            'assets/images/logo.png',
+            height: 85,
+            fit: BoxFit.contain,
+            errorBuilder: (ctx, err, stack) => const Icon(
+              Icons.menu_book_rounded,
+              size: 60,
+              color: Color(0xFF1E3A8A),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'MyLibbook',
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: const Color(0xFF0F172A),
+            letterSpacing: 0.5,
+          ),
+        ),
+        const Text(
+          'Smart. Organized. Knowledge.',
+          style: TextStyle(
+            color: Color(0xFF0284C7),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.3,
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Toggle Buttons (Login / Register)
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.all(4),
+          child: Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() {
+                    _isLogin = true;
+                    _errorMessage = null;
+                  }),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _isLogin ? Colors.white : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: _isLogin
+                          ? [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 4,
+                              ),
+                            ]
+                          : [],
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Secure Login',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: _isLogin ? const Color(0xFF4338CA) : Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() {
+                    _isLogin = false;
+                    _errorMessage = null;
+                  }),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: !_isLogin ? Colors.white : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: !_isLogin
+                          ? [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 4,
+                              ),
+                            ]
+                          : [],
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Register Staff',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: !_isLogin ? const Color(0xFF4338CA) : Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        if (_errorMessage != null) ...[
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.red.shade200),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _errorMessage!,
+                    style: TextStyle(
+                      color: Colors.red.shade800,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        if (_isLogin) ...[
+          TextField(
+            controller: _loginUserCtrl,
+            enabled: _lockoutSeconds == 0,
+            decoration: InputDecoration(
+              labelText: 'Username or Email',
+              prefixIcon: const Icon(Icons.account_circle_outlined),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _loginPassCtrl,
+            obscureText: _obscureLoginPass,
+            enabled: _lockoutSeconds == 0,
+            decoration: InputDecoration(
+              labelText: 'Password',
+              prefixIcon: const Icon(Icons.lock_outline),
+              suffixIcon: IconButton(
+                icon: Icon(_obscureLoginPass ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscureLoginPass = !_obscureLoginPass),
+              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _lockoutSeconds > 0 ? Colors.grey : const Color(0xFF4338CA),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: (_isLoading || _lockoutSeconds > 0) ? null : _handleLogin,
+              icon: _isLoading
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.lock_open_rounded),
+              label: Text(
+                _lockoutSeconds > 0 ? 'Locked (${_lockoutSeconds}s)' : 'Authenticate & Enter',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ] else ...[
+          TextField(
+            controller: _signupNameCtrl,
+            decoration: InputDecoration(
+              labelText: 'Staff Name / Username',
+              prefixIcon: const Icon(Icons.person_outline),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _signupEmailCtrl,
+            decoration: InputDecoration(
+              labelText: 'Email Address',
+              prefixIcon: const Icon(Icons.email_outlined),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _signupSecurityKeyCtrl,
+            obscureText: _obscureSecurityKey,
+            decoration: InputDecoration(
+              labelText: 'Master Security Key',
+              prefixIcon: const Icon(Icons.vpn_key_outlined, color: Colors.orange),
+              suffixIcon: IconButton(
+                icon: Icon(_obscureSecurityKey ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscureSecurityKey = !_obscureSecurityKey),
+              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _signupPassCtrl,
+            obscureText: _obscureSignupPass,
+            decoration: InputDecoration(
+              labelText: 'Create Password',
+              prefixIcon: const Icon(Icons.lock_outline),
+              suffixIcon: IconButton(
+                icon: Icon(_obscureSignupPass ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscureSignupPass = !_obscureSignupPass),
+              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _signupConfirmPassCtrl,
+            obscureText: _obscureSignupConfirmPass,
+            decoration: InputDecoration(
+              labelText: 'Confirm Password',
+              prefixIcon: const Icon(Icons.lock_outline),
+              suffixIcon: IconButton(
+                icon: Icon(_obscureSignupConfirmPass ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscureSignupConfirmPass = !_obscureSignupConfirmPass),
+              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4338CA),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: _isLoading ? null : _handleSignup,
+              icon: _isLoading
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.how_to_reg_rounded),
+              label: const Text('Create Account & Login', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+
+        if (_savedUsername != null && _savedUsername!.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          TextButton.icon(
+            onPressed: () {
+              setState(() {
+                _isQuickUnlockMode = true;
+                _errorMessage = null;
+              });
+              _authenticateWithDeviceLock();
+            },
+            icon: const Icon(Icons.fingerprint_rounded, size: 18),
+            label: Text('Use Screen Lock / Fingerprint for $_savedUsername', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ],
     );
   }
 }
