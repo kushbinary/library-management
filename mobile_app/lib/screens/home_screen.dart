@@ -1780,38 +1780,49 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _buildSeatMapTab() {
     final seatMap = _occupiedSeatsMap;
     final allSeats = _allSeatNumbers;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Top Legend & Controls Card
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              borderRadius: BorderRadius.circular(18),
               boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
+                BoxShadow(
+                  color: isDark ? Colors.black.withValues(alpha: 0.3) : Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
               ],
+              border: Border.all(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
+                Wrap(
+                  spacing: 6,
                   children: [
-                    _buildSeatLegendItem('खाली (Vacant)', Colors.green.shade600, Colors.green.shade50),
-                    const SizedBox(width: 6),
-                    _buildSeatLegendItem('भरी (Occupied)', Colors.orange.shade800, Colors.orange.shade50),
+                    _buildSeatLegendItem('Vacant', const Color(0xFF10B981), isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5)),
+                    _buildSeatLegendItem('Occupied', const Color(0xFF6366F1), isDark ? const Color(0xFF312E81) : const Color(0xFFEEF2FF)),
+                    _buildSeatLegendItem('Due/Exp', const Color(0xFFEF4444), isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEF2F2)),
                   ],
                 ),
                 OutlinedButton.icon(
                   onPressed: _showEditSeatsLayoutModal,
-                  icon: const Icon(Icons.tune_rounded, size: 16, color: Color(0xFF4338CA)),
-                  label: const Text('Edit Seats', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4338CA))),
+                  icon: const Icon(Icons.tune_rounded, size: 16),
+                  label: const Text('Edit Seats', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    side: const BorderSide(color: Color(0xFF4338CA)),
+                    foregroundColor: isDark ? const Color(0xFF818CF8) : const Color(0xFF4338CA),
+                    side: BorderSide(color: isDark ? const Color(0xFF818CF8) : const Color(0xFF4338CA)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
@@ -1820,30 +1831,53 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           const SizedBox(height: 14),
 
+          // Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Live Seat Layout (${allSeats.length} Seats)',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E1B4B)),
+              Row(
+                children: [
+                  const Icon(Icons.desk_rounded, size: 20, color: Color(0xFF4338CA)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Study Desks & Cabins (${allSeats.length})',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      color: isDark ? Colors.white : const Color(0xFF1E1B4B),
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                '$_vacantCount Free / $_totalCapacity Total',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 13),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$_vacantCount Desks Available',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF10B981),
+                    fontSize: 12,
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
+          // Library Study Table & Cubicle Grid
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: allSeats.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 5,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 0.95,
+              crossAxisCount: 4,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 12,
+              childAspectRatio: 0.76,
             ),
             itemBuilder: (context, index) {
               final seatNo = allSeats[index];
@@ -1851,23 +1885,38 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               final student = seatMap[seatNo];
               final isExpired = student != null && student.isExpired;
 
-              Color bg = Colors.green.shade50;
-              Color border = Colors.green.shade300;
-              Color textCol = Colors.green.shade900;
-              IconData icon = Icons.chair_outlined;
+              // Theme Colors for Study Desk
+              Color deskColor;
+              Color surfaceColor;
+              Color textCol;
+              Color chairColor;
+              IconData deskIcon;
+              String statusLabel;
 
-              if (isOccupied) {
-                if (isExpired) {
-                  bg = Colors.red.shade50;
-                  border = Colors.red.shade300;
-                  textCol = Colors.red.shade900;
-                  icon = Icons.event_busy_rounded;
-                } else {
-                  bg = Colors.orange.shade50;
-                  border = Colors.orange.shade300;
-                  textCol = Colors.orange.shade900;
-                  icon = Icons.person_rounded;
-                }
+              if (!isOccupied) {
+                // Free Study Desk
+                deskColor = const Color(0xFF10B981);
+                surfaceColor = isDark ? const Color(0xFF064E3B).withValues(alpha: 0.35) : const Color(0xFFECFDF5);
+                textCol = isDark ? const Color(0xFF34D399) : const Color(0xFF065F46);
+                chairColor = const Color(0xFF10B981);
+                deskIcon = Icons.menu_book_rounded;
+                statusLabel = 'Vacant';
+              } else if (isExpired) {
+                // Expired / Due Desk
+                deskColor = const Color(0xFFEF4444);
+                surfaceColor = isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.35) : const Color(0xFFFEF2F2);
+                textCol = isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B);
+                chairColor = const Color(0xFFEF4444);
+                deskIcon = Icons.timer_outlined;
+                statusLabel = student?.name.split(' ').first ?? 'Expired';
+              } else {
+                // Active Occupied Desk
+                deskColor = const Color(0xFF6366F1);
+                surfaceColor = isDark ? const Color(0xFF312E81).withValues(alpha: 0.35) : const Color(0xFFEEF2FF);
+                textCol = isDark ? const Color(0xFFA5B4FC) : const Color(0xFF3730A3);
+                chairColor = const Color(0xFF6366F1);
+                deskIcon = Icons.school_rounded;
+                statusLabel = student?.name.split(' ').first ?? 'Occupied';
               }
 
               return InkWell(
@@ -1878,32 +1927,96 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     _showBookSeatDialog(seatNo);
                   }
                 },
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: bg,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: border, width: 1.5),
-                  ),
-                  padding: const EdgeInsets.all(4),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(icon, size: 18, color: textCol),
-                      const SizedBox(height: 3),
-                      Text(
-                        seatNo,
-                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: textCol),
+                    color: surfaceColor,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: deskColor.withValues(alpha: 0.5), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: deskColor.withValues(alpha: isDark ? 0.15 : 0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        isOccupied ? (student?.name.split(' ').first ?? 'Bhari') : 'Khali',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          color: textCol.withValues(alpha: 0.8),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      // 1. Study Table Top Partition / Board
+                      Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: deskColor,
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                         ),
-                        overflow: TextOverflow.ellipsis,
+                      ),
+
+                      // 2. Study Table Top Surface
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              // Seat Badge on Desk
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: deskColor.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  seatNo,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 12,
+                                    color: textCol,
+                                  ),
+                                ),
+                              ),
+
+                              // Study Symbol (Book / Student studying / Lamp)
+                              Icon(
+                                deskIcon,
+                                size: 22,
+                                color: deskColor,
+                              ),
+
+                              // Student Name or Vacant Status
+                              Text(
+                                statusLabel,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: textCol,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // 3. Ergonomic Study Chair Representation
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        decoration: BoxDecoration(
+                          color: deskColor.withValues(alpha: 0.12),
+                          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                          border: Border(top: BorderSide(color: deskColor.withValues(alpha: 0.25), width: 1)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.chair_alt_rounded,
+                              size: 14,
+                              color: chairColor,
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -1919,13 +2032,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Widget _buildSeatLegendItem(String label, Color dotColor, Color bg) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: dotColor.withValues(alpha: 0.3)),
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 10, height: 10, decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle)),
-          const SizedBox(width: 6),
-          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: dotColor)),
+          Icon(Icons.desk_rounded, size: 13, color: dotColor),
+          const SizedBox(width: 4),
+          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: dotColor)),
         ],
       ),
     );
