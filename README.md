@@ -31,3 +31,15 @@ Welcome to the Library Management System! This is a comprehensive solution desig
 ## License
 
 This project is licensed under the MIT License.
+
+# 📚 Library Management System
+
+Welcome to the Library Management System repository! 
+
+## 🚀 Tech Stack
+* **Frontend:** Flutter (Dart)
+* **Backend:** Node.js / Python 
+* **Database:** PostgreSQL (hosted on Neon)
+
+## 📱 Download the App
+Check the [Releases](https://github.com/kushbinary/library-management/releases) section to download the latest APKs.
