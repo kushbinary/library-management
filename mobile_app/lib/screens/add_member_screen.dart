@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/member.dart';
 import '../services/api_service.dart';
 
@@ -84,6 +86,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
     try {
       if (widget.member == null) {
         await ApiService.addMember(member);
+        if (mounted) await _showSuccessPopup(member);
       } else {
         await ApiService.updateMemberForUser('admin', member); // Hardcoded admin for now
       }
@@ -109,6 +112,70 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
     if (picked != null) {
       setState(() => onSelected(picked));
     }
+  }
+
+  Future<void> _showSuccessPopup(Member member) async {
+    final prefs = await SharedPreferences.getInstance();
+    final libName = prefs.getString('library_custom_business_name') ?? 'Our Library';
+    final dateFormat = DateFormat('dd MMM yyyy');
+    
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Column(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Colors.green, size: 48),
+            const SizedBox(height: 12),
+            Text('Welcome to $libName!', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Name: ${member.name}', style: const TextStyle(fontSize: 16)),
+            const SizedBox(height: 8),
+            Text('Timing: ${member.timing}', style: const TextStyle(fontSize: 16)),
+            const SizedBox(height: 8),
+            Text('Seat: ${member.seatNumber.isEmpty ? 'N/A' : member.seatNumber}', style: const TextStyle(fontSize: 16)),
+            const SizedBox(height: 8),
+            Text('Duration: ${dateFormat.format(DateTime.parse(member.startDate))} - ${dateFormat.format(DateTime.parse(member.expiryDate))}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.blueAccent)),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            child: const Text('Awesome!'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showQrDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Payment QR Code', textAlign: TextAlign.center),
+        content: SizedBox(
+          width: 250,
+          height: 250,
+          child: Center(
+            child: QrImageView(
+              data: "upi://pay?pa=library@upi&pn=Library",
+              version: QrVersions.auto,
+              size: 250.0,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+        ],
+      ),
+    );
   }
 
   @override
@@ -190,8 +257,18 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
                   ),
 
                   const SizedBox(height: 24),
-                  const Text('Financials', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Financials', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      TextButton.icon(
+                        onPressed: _showQrDialog,
+                        icon: const Icon(Icons.qr_code_2_rounded),
+                        label: const Text('Show QR'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
