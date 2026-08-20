@@ -120,8 +120,26 @@ class ApiService {
         final List<dynamic> list = json.decode(response.body);
         final students = list.map((item) => Student.fromJson(item)).toList();
 
+
         // Update local cache for this specific user
+        // Merge offline added students (IDs > 1000000000000)
+        try {
+          final raw = prefs.getString(key);
+          if (raw != null) {
+             final List<dynamic> oldList = json.decode(raw);
+             for(var item in oldList) {
+               final s = Student.fromJson(item);
+               if (s.id != null && s.id! > 1000000000000) {
+                 if (!students.any((e) => e.id == s.id)) {
+                   students.insert(0, s);
+                 }
+               }
+             }
+          }
+        } catch (_) {}
+
         final jsonList = students.map((s) => s.toJson()).toList();
+
         await prefs.setString(key, json.encode(jsonList));
 
         return students;

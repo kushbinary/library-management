@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/student.dart';
 import '../services/api_service.dart';
 import 'package:intl/intl.dart';
+import 'add_student_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -18,9 +19,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoading = true;
   String _currentUser = 'kushbinary';
   String _businessName = 'MyLibBook';
-  String _avatarGender = 'female'; // 'male' or 'female'
+  String _avatarUrl = 'https://api.dicebear.com/7.x/avataaars/png?seed=Aneka'; 
   List<String> _seatList = [];
   final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+
+  final List<String> _maleAvatars = [
+    'https://api.dicebear.com/7.x/avataaars/png?seed=Felix',
+    'https://api.dicebear.com/7.x/avataaars/png?seed=Oliver',
+    'https://api.dicebear.com/7.x/avataaars/png?seed=Jack',
+    'https://api.dicebear.com/7.x/avataaars/png?seed=George',
+  ];
+
+  final List<String> _femaleAvatars = [
+    'https://api.dicebear.com/7.x/avataaars/png?seed=Aneka',
+    'https://api.dicebear.com/7.x/avataaars/png?seed=Mia',
+    'https://api.dicebear.com/7.x/avataaars/png?seed=Sophia',
+    'https://api.dicebear.com/7.x/avataaars/png?seed=Emma',
+  ];
 
   @override
   void initState() {
@@ -32,12 +47,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final prefs = await SharedPreferences.getInstance();
     final user = prefs.getString('current_logged_in_user') ?? 'kushbinary';
     final bName = prefs.getString('library_custom_business_name') ?? 'MyLibBook';
-    final avatar = prefs.getString('library_admin_avatar_gender') ?? 'female';
+    
+    String? avatar = prefs.getString('library_admin_avatar_url');
+    if (avatar == null) {
+      final gender = prefs.getString('library_admin_avatar_gender') ?? 'female';
+      avatar = gender == 'male' ? _maleAvatars[0] : _femaleAvatars[0];
+    }
     
     setState(() {
       _currentUser = user;
       _businessName = bName;
-      _avatarGender = avatar;
+      _avatarUrl = avatar!;
     });
     
     await _loadCustomSeats();
@@ -74,12 +94,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  Future<void> _toggleAvatarGender() async {
-    final newGender = _avatarGender == 'female' ? 'male' : 'female';
+  Future<void> _setAvatar(String url) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('library_admin_avatar_gender', newGender);
+    await prefs.setString('library_admin_avatar_url', url);
     setState(() {
-      _avatarGender = newGender;
+      _avatarUrl = url;
     });
   }
 
@@ -119,14 +138,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   List<Student> get _last5Admissions {
     final sorted = List<Student>.from(_students);
-    // Sort by admission date descending
     sorted.sort((a, b) {
       try {
         DateTime dateA = DateTime.parse(a.admissionDate);
         DateTime dateB = DateTime.parse(b.admissionDate);
         return dateB.compareTo(dateA);
       } catch (e) {
-        return 0; // Fallback if parsing fails
+        return b.id!.compareTo(a.id!); 
       }
     });
     return sorted.take(5).toList();
@@ -142,6 +160,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final added = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(builder: (context) => const AddStudentScreen()),
+          );
+          if (added == true) {
+            _loadStudents();
+          }
+        },
+        backgroundColor: const Color(0xFF818CF8),
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.person_add_rounded),
+        label: const Text('Add Member'),
+      ),
       body: Container(
         decoration: BoxDecoration(gradient: bgGradient),
         child: SafeArea(
@@ -163,7 +196,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         _buildMetricsRow(),
                         const SizedBox(height: 28),
                         _buildLast5AdmissionsList(),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 80), 
                       ],
                     ),
                   ),
@@ -233,53 +266,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 showModalBottomSheet(
                   context: context,
                   backgroundColor: const Color(0xFF1E293B),
+                  isScrollControlled: true,
                   shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
                   builder: (ctx) => Padding(
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text('Change Avatar', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        const Text('Choose Avatar', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 20),
+                        const Text('Male', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                        const SizedBox(height: 10),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            GestureDetector(
-                              onTap: () {
-                                _toggleAvatarGender();
-                                Navigator.pop(ctx);
-                              },
-                              child: Column(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 30,
-                                    backgroundImage: const NetworkImage('https://i.pravatar.cc/150?u=maleadmin'),
-                                    backgroundColor: _avatarGender == 'male' ? Colors.indigo : Colors.transparent,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text('Male', style: TextStyle(color: _avatarGender == 'male' ? Colors.indigo.shade300 : Colors.white)),
-                                ],
-                              ),
+                          children: _maleAvatars.map((url) => GestureDetector(
+                            onTap: () {
+                              _setAvatar(url);
+                              Navigator.pop(ctx);
+                            },
+                            child: CircleAvatar(
+                              radius: 30,
+                              backgroundImage: NetworkImage(url),
+                              backgroundColor: _avatarUrl == url ? Colors.indigo : Colors.transparent,
                             ),
-                            GestureDetector(
-                              onTap: () {
-                                _toggleAvatarGender();
-                                Navigator.pop(ctx);
-                              },
-                              child: Column(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 30,
-                                    backgroundImage: const NetworkImage('https://i.pravatar.cc/150?u=sarah'),
-                                    backgroundColor: _avatarGender == 'female' ? Colors.pink : Colors.transparent,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text('Female', style: TextStyle(color: _avatarGender == 'female' ? Colors.pink.shade300 : Colors.white)),
-                                ],
-                              ),
-                            ),
-                          ],
+                          )).toList(),
                         ),
+                        const SizedBox(height: 20),
+                        const Text('Female', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: _femaleAvatars.map((url) => GestureDetector(
+                            onTap: () {
+                              _setAvatar(url);
+                              Navigator.pop(ctx);
+                            },
+                            child: CircleAvatar(
+                              radius: 30,
+                              backgroundImage: NetworkImage(url),
+                              backgroundColor: _avatarUrl == url ? Colors.pink : Colors.transparent,
+                            ),
+                          )).toList(),
+                        ),
+                        const SizedBox(height: 20),
                       ],
                     ),
                   ),
@@ -292,11 +321,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFF818CF8), width: 2),
                   image: DecorationImage(
-                    image: NetworkImage(
-                      _avatarGender == 'male' 
-                          ? 'https://i.pravatar.cc/150?u=maleadmin' 
-                          : 'https://i.pravatar.cc/150?u=sarah'
-                    ),
+                    image: NetworkImage(_avatarUrl),
                     fit: BoxFit.cover,
                   ),
                 ),
