@@ -23,3 +23,6 @@ mobile_app/.flutter-plugins-dependencies
 .idea/
 .DS_Store
 *.log
+
+# Ignore APKs
+*.apk
