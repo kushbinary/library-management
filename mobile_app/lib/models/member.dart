@@ -12,6 +12,7 @@ class Member {
   final String startDate;
   final String expiryDate;
   final String seatNumber;
+  final String timing;
   final String status;
   final String notes;
   final String profilePhoto;
@@ -34,6 +35,7 @@ class Member {
     required this.startDate,
     required this.expiryDate,
     required this.seatNumber,
+    this.timing = '4 Hours Slot',
     this.status = 'Active',
     this.notes = '',
     this.profilePhoto = '',
@@ -57,6 +59,7 @@ class Member {
       startDate: json['start_date'] ?? json['admission_date'] ?? json['admissionDate'] ?? '',
       expiryDate: json['expiry_date'] ?? json['expiryDate'] ?? '',
       seatNumber: json['seat_number'] ?? json['seatNumber'] ?? '',
+      timing: json['timing'] ?? '4 Hours Slot',
       status: json['status'] ?? 'Active',
       notes: json['notes'] ?? '',
       profilePhoto: json['profile_photo'] ?? '',
@@ -81,6 +84,7 @@ class Member {
       'start_date': startDate,
       'expiry_date': expiryDate,
       'seat_number': seatNumber,
+      'timing': timing,
       'status': status,
       'notes': notes,
       'profile_photo': profilePhoto,
@@ -104,6 +108,7 @@ class Member {
     String? startDate,
     String? expiryDate,
     String? seatNumber,
+    String? timing,
     String? status,
     String? notes,
     String? profilePhoto,
@@ -125,6 +130,7 @@ class Member {
       startDate: startDate ?? this.startDate,
       expiryDate: expiryDate ?? this.expiryDate,
       seatNumber: seatNumber ?? this.seatNumber,
+      timing: timing ?? this.timing,
       status: status ?? this.status,
       notes: notes ?? this.notes,
       profilePhoto: profilePhoto ?? this.profilePhoto,
@@ -158,6 +164,5 @@ class Member {
     }
   }
 
-  String get timing => "N/A";
   String get admissionDate => joiningDate;
 }
