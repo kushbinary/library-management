@@ -17,11 +17,20 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
 
   late TextEditingController _nameCtrl;
   late TextEditingController _phoneCtrl;
-  late TextEditingController _whatsappCtrl;
   late TextEditingController _seatCtrl;
   late TextEditingController _totalFeeCtrl;
   late TextEditingController _paidAmtCtrl;
   
+  bool _sameAsWhatsapp = true;
+  String _selectedTimingSlot = '8 AM - 12 PM (4 Hrs)';
+  final List<String> _timingSlots = [
+    '8 AM - 12 PM (4 Hrs)', 
+    '12 PM - 4 PM (4 Hrs)', 
+    '4 PM - 8 PM (4 Hrs)', 
+    '8 AM - 8 PM (Full Day)', 
+    '24 Hours Access'
+  ];
+
   DateTime _joiningDate = DateTime.now();
   DateTime _startDate = DateTime.now();
   DateTime _expiryDate = DateTime.now().add(const Duration(days: 30));
@@ -32,12 +41,16 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
     final m = widget.member;
     _nameCtrl = TextEditingController(text: m?.name ?? '');
     _phoneCtrl = TextEditingController(text: m?.phone ?? '');
-    _whatsappCtrl = TextEditingController(text: m?.whatsapp ?? '');
     _seatCtrl = TextEditingController(text: m?.seatNumber ?? '');
     _totalFeeCtrl = TextEditingController(text: m?.totalFee.toString() ?? '');
     _paidAmtCtrl = TextEditingController(text: m?.paidAmount.toString() ?? '');
     
     if (m != null) {
+      _sameAsWhatsapp = (m.phone == m.whatsapp);
+      if (_timingSlots.contains(m.timing)) {
+        _selectedTimingSlot = m.timing;
+      }
+
       try { _joiningDate = DateTime.parse(m.joiningDate); } catch (_) {}
       try { _startDate = DateTime.parse(m.startDate); } catch (_) {}
       try { _expiryDate = DateTime.parse(m.expiryDate); } catch (_) {}
@@ -57,8 +70,9 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
       id: widget.member?.id,
       name: _nameCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
-      whatsapp: _whatsappCtrl.text.trim(),
+      whatsapp: _sameAsWhatsapp ? _phoneCtrl.text.trim() : _phoneCtrl.text.trim(),
       seatNumber: _seatCtrl.text.trim().toUpperCase(),
+      timing: _selectedTimingSlot,
       joiningDate: _joiningDate.toIso8601String(),
       startDate: _startDate.toIso8601String(),
       expiryDate: _expiryDate.toIso8601String(),
@@ -67,14 +81,21 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
       dueAmount: due,
     );
 
-    if (widget.member == null) {
-      await ApiService.addMember(member);
-    } else {
-      await ApiService.updateMemberForUser('admin', member); // Hardcoded admin for now
-    }
+    try {
+      if (widget.member == null) {
+        await ApiService.addMember(member);
+      } else {
+        await ApiService.updateMemberForUser('admin', member); // Hardcoded admin for now
+      }
 
-    if (mounted) {
-      Navigator.pop(context, true);
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saving member: $e')));
+      }
     }
   }
 
@@ -99,7 +120,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator())
         : SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 32),
             child: Form(
               key: _formKey,
               child: Column(
@@ -119,15 +140,33 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
                     decoration: const InputDecoration(labelText: 'Phone Number', prefixIcon: Icon(Icons.phone)),
                     validator: (v) => v!.isEmpty ? 'Required' : null,
                   ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _whatsappCtrl,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(labelText: 'WhatsApp Number', prefixIcon: Icon(Icons.chat)),
+                  const SizedBox(height: 8),
+                  CheckboxListTile(
+                    title: const Text('Same as WhatsApp number'),
+                    value: _sameAsWhatsapp,
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    onChanged: (val) => setState(() => _sameAsWhatsapp = val ?? true),
                   ),
                   
                   const SizedBox(height: 24),
                   const Text('Membership Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  const Text('Select Shift/Timing Slot', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _timingSlots.map((slot) {
+                      return ChoiceChip(
+                        label: Text(slot),
+                        selected: _selectedTimingSlot == slot,
+                        onSelected: (selected) {
+                          if (selected) setState(() => _selectedTimingSlot = slot);
+                        },
+                      );
+                    }).toList(),
+                  ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _seatCtrl,
@@ -171,6 +210,26 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 12),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [700, 800, 1000, 1200].map((amt) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ActionChip(
+                            label: Text('₹$amt'),
+                            onPressed: () {
+                              setState(() {
+                                _totalFeeCtrl.text = amt.toString();
+                                _paidAmtCtrl.text = amt.toString();
+                              });
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
 
                   const SizedBox(height: 32),

@@ -16,7 +16,7 @@ class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   static Database? _database;
   static const _dbName = "mylibbook_v2.db";
-  static const _dbVersion = 1;
+  static const _dbVersion = 2;
 
   DatabaseHelper._internal();
 
@@ -37,6 +37,7 @@ class DatabaseHelper {
       path,
       version: _dbVersion,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -59,7 +60,10 @@ class DatabaseHelper {
         profile_photo TEXT,
         total_fee REAL,
         paid_amount REAL,
-        due_amount REAL
+        due_amount REAL,
+        timing TEXT,
+        payment_mode TEXT,
+        payment_status TEXT
       )
     ''');
 
@@ -122,6 +126,14 @@ class DatabaseHelper {
 
     // Run migration after creating tables
     await _migrateOldData(db);
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      try { await db.execute('ALTER TABLE members ADD COLUMN timing TEXT'); } catch (_) {}
+      try { await db.execute('ALTER TABLE members ADD COLUMN payment_mode TEXT'); } catch (_) {}
+      try { await db.execute('ALTER TABLE members ADD COLUMN payment_status TEXT'); } catch (_) {}
+    }
   }
 
   Future<void> _migrateOldData(Database db) async {
