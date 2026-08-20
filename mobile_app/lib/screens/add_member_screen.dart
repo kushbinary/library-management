@@ -4,6 +4,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/member.dart';
 import '../services/api_service.dart';
+import '../services/whatsapp_service.dart';
 
 class AddMemberScreen extends StatefulWidget {
   final Member? member;
@@ -145,11 +146,48 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
           ],
         ),
         actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-            child: const Text('Awesome!'),
-          ),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                  child: const Text('Close'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final msg = '''Welcome to $libName! 🎉
+
+👤 Name: ${member.name}
+⏰ Timing: ${member.timing}
+🪑 Seat: ${member.seatNumber.isEmpty ? 'N/A' : member.seatNumber}
+📅 Duration: ${dateFormat.format(DateTime.parse(member.startDate))} to ${dateFormat.format(DateTime.parse(member.expiryDate))}
+
+Thank you for joining us!''';
+                    
+                    await WhatsappService.openWhatsApp(
+                      member.whatsapp.isNotEmpty ? member.whatsapp : member.phone, 
+                      msg
+                    );
+                    
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                    }
+                  },
+                  icon: const Icon(Icons.send_rounded, size: 20),
+                  label: const Text('WhatsApp'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade600, 
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14)
+                  ),
+                ),
+              ),
+            ],
+          )
         ],
       ),
     );
