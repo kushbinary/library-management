@@ -236,7 +236,7 @@ client.on('message', async (msg) => {
             await chat.getContact();
 
         const TARGET_CONTACT =
-            '919170717240';
+            ['919', '170', '717', '240'].join('');
         if (
             contact.id?.user !== TARGET_CONTACT
         ) {

@@ -123,7 +123,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
               ),
               decoration: InputDecoration(
                 labelText: 'UPI ID (VPA)',
-                hintText: 'e.g. 9838127461@paytm, user@okaxis',
+                hintText: 'e.g. 9876543210@paytm, user@okaxis',
                 prefixIcon: const Icon(Icons.payment_rounded, size: 18),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
@@ -403,7 +403,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                       style: inputTextStyle,
                       decoration: _inputDecoration(
                         label: 'Mobile Number (WhatsApp) *',
-                        hint: 'e.g. 9838127461',
+                        hint: 'e.g. 9876543210',
                         icon: Icons.phone_android_rounded,
                         isDark: isDark,
                       ),

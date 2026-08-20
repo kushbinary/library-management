@@ -845,7 +845,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                         style: textStyle,
                                         decoration: InputDecoration(
                                           labelText: 'Mobile Number / WhatsApp',
-                                          hintText: 'e.g. 9838127461',
+                                          hintText: 'e.g. 9876543210',
                                           prefixIcon: Icon(Icons.phone_rounded, color: primaryColor, size: 20),
                                         ),
                                       ),
