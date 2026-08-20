@@ -385,7 +385,10 @@ def change_password():
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    active_members = 0
+    if 'user_id' in session:
+        active_members = Student.query.filter_by(user_id=session['user_id']).count()
+    return render_template('index.html', active_members=active_members)
 
 
 @app.route('/students')

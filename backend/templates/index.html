@@ -1,34 +1,196 @@
 {% extends 'base.html' %}
 
-{% block title %}Library Dashboard{% endblock %}
+{% block title %}Smart Library Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-header {
+        margin-bottom: 2.5rem;
+    }
+    .welcome-text {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--text-main);
+        letter-spacing: -0.5px;
+    }
+    .welcome-text span {
+        color: var(--primary);
+    }
+    .stat-card {
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 1.8rem;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 30px rgba(0,0,0,0.4);
+        border-color: rgba(99, 102, 241, 0.4);
+    }
+    .stat-icon {
+        width: 45px;
+        height: 45px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.05);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        color: var(--text-muted);
+        margin-bottom: 1.2rem;
+    }
+    .stat-title {
+        font-size: 0.95rem;
+        color: var(--text-muted);
+        font-weight: 500;
+        margin-bottom: 0.3rem;
+    }
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: var(--text-main);
+        line-height: 1.2;
+        margin-bottom: 0.5rem;
+    }
+    .stat-change {
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-bottom: auto;
+    }
+    .text-success-custom { color: #10B981; }
+    .text-danger-custom { color: #EF4444; }
+    
+    /* CSS Animation for Smart Charts */
+    @keyframes drawChart {
+        to { stroke-dashoffset: 0; }
+    }
+    .svg-chart path {
+        stroke-dasharray: 200;
+        stroke-dashoffset: 200;
+        animation: drawChart 1.5s ease-out forwards;
+        animation-delay: 0.5s;
+    }
+    .chart-container {
+        margin-top: 1.5rem;
+        height: 50px;
+        position: relative;
+        opacity: 0.8;
+    }
+    
+    /* Bar chart mock */
+    .bar-chart {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        height: 50px;
+        gap: 6px;
+        margin-top: 1.5rem;
+        opacity: 0.7;
+    }
+    @keyframes growBar {
+        from { transform: scaleY(0); }
+        to { transform: scaleY(1); }
+    }
+    .bar-chart div {
+        background-color: var(--primary);
+        flex: 1;
+        border-radius: 3px;
+        transform-origin: bottom;
+        animation: growBar 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .action-card {
+        background-color: rgba(99, 102, 241, 0.05);
+        border: 1px solid rgba(99, 102, 241, 0.2);
+        border-radius: 16px;
+        padding: 2rem;
+        margin-top: 2rem;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-lg-8 text-center">
-        <div class="card shadow-lg">
-            <div class="card-header bg-primary text-white">
-                <h3 class="mb-0"><i class="bi bi-book"></i> Welcome to Library Management System</h3>
-            </div>
-            <div class="card-body py-5">
-                <i class="bi bi-book" style="font-size: 5rem; color: #6f42c1; opacity: 0.2;"></i>
-                <h3 class="card-title mb-4">Manage your students with ease</h3>
-                <p class="card-text text-muted mx-auto" style="max-width: 600px;">
-                    Register new students, track their membership status, and send WhatsApp notifications about admission and expiry dates.
-                </p>
-                <div class="d-flex justify-content-center gap-3 flex-wrap mb-4">
-                    <a href="{{ url_for('add_student') }}" class="btn btn-primary btn-lg px-4">
-                        <i class="bi bi-plus-circle"></i> Add Student
-                    </a>
-                    <a href="{{ url_for('student_list') }}" class="btn btn-outline-primary btn-lg px-4">
-                        <i class="bi bi-people"></i> View Students
-                    </a>
-                    <a href="{{ url_for('download_apk') }}" class="btn btn-success btn-lg px-4">
-                        <i class="bi bi-android2"></i> Download Android APK
-                    </a>
-                </div>
+<div class="dashboard-header animate-fade-in">
+    <h1 class="welcome-text">Welcome back, <span>{{ session.get('admin_user', 'Admin') }}!</span></h1>
+    <p class="text-muted">Library Dashboard Overview & Statistics</p>
+</div>
 
+<div class="row g-4 mb-4">
+    <!-- Stat 1: Total Books -->
+    <div class="col-md-4 animate-fade-in" style="animation-delay: 0.1s;">
+        <div class="stat-card">
+            <div class="stat-icon"><i class="bi bi-book-half"></i></div>
+            <div class="stat-title">Total Books</div>
+            <div class="stat-value">14,850</div>
+            <div class="stat-change text-success-custom"><i class="bi bi-arrow-up-right"></i> +3.2% this month</div>
+            
+            <div class="chart-container">
+                <svg class="svg-chart" width="100%" height="100%" viewBox="0 0 150 40" preserveAspectRatio="none">
+                    <path d="M0,35 Q20,10 40,30 T80,15 T150,5" fill="none" stroke="var(--primary)" stroke-width="3" stroke-linecap="round"/>
+                </svg>
             </div>
         </div>
+    </div>
+    
+    <!-- Stat 2: Active Members -->
+    <div class="col-md-4 animate-fade-in" style="animation-delay: 0.2s;">
+        <div class="stat-card">
+            <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
+            <div class="stat-title">Active Members</div>
+            <div class="stat-value">{{ active_members if active_members is defined else '2,315' }}</div>
+            <div class="stat-change text-success-custom"><i class="bi bi-arrow-up-right"></i> +1.6% this week</div>
+            
+            <div class="chart-container">
+                <svg class="svg-chart" width="100%" height="100%" viewBox="0 0 150 40" preserveAspectRatio="none">
+                    <path d="M0,25 Q30,40 60,10 T110,20 T150,5" fill="none" stroke="var(--primary)" stroke-width="3" stroke-linecap="round"/>
+                </svg>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Stat 3: Recent Returns -->
+    <div class="col-md-4 animate-fade-in" style="animation-delay: 0.3s;">
+        <div class="stat-card">
+            <div class="stat-icon"><i class="bi bi-arrow-counterclockwise"></i></div>
+            <div class="stat-title">Recent Returns</div>
+            <div class="stat-value">84</div>
+            <div class="stat-change text-danger-custom"><i class="bi bi-arrow-down-right"></i> -0.5% today</div>
+            
+            <div class="bar-chart">
+                <div style="height: 30%; animation-delay: 0.1s"></div>
+                <div style="height: 50%; animation-delay: 0.2s"></div>
+                <div style="height: 40%; animation-delay: 0.3s"></div>
+                <div style="height: 70%; animation-delay: 0.4s"></div>
+                <div style="height: 45%; animation-delay: 0.5s"></div>
+                <div style="height: 90%; animation-delay: 0.6s"></div>
+                <div style="height: 60%; animation-delay: 0.7s"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="action-card animate-fade-in" style="animation-delay: 0.4s;">
+    <h5 class="mb-4 fw-bold"><i class="bi bi-lightning-charge-fill text-warning me-2"></i> Quick Actions</h5>
+    <div class="d-flex gap-3 flex-wrap">
+        <a href="{{ url_for('add_student') }}" class="btn btn-primary px-4 py-2 rounded-pill shadow-sm">
+            <i class="bi bi-person-plus-fill me-1"></i> Add New Member
+        </a>
+        <a href="{{ url_for('student_list') }}" class="btn btn-outline-light px-4 py-2 rounded-pill">
+            <i class="bi bi-list-ul me-1"></i> View All Members
+        </a>
+        <a href="{{ url_for('download_apk') }}" class="btn btn-outline-light px-4 py-2 rounded-pill border-0 text-primary" style="background: rgba(99, 102, 241, 0.1);">
+            <i class="bi bi-android2 me-1"></i> Download Mobile App
+        </a>
     </div>
 </div>
 {% endblock %}
