@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dashboard_screen.dart';
-import 'members_screen.dart';
-import 'settings_screen.dart';
-import 'reports_screen.dart';
+import 'members_list_screen.dart';
+import 'seats_screen.dart';
+import 'payments_screen.dart';
+import 'more_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -16,42 +17,47 @@ class _MainNavigationState extends State<MainNavigation> {
 
   final List<Widget> _screens = [
     const DashboardScreen(),
-    const MembersScreen(),
-    const ReportsScreen(),
-    const SettingsScreen(),
+    const MembersScreen(), // Keep existing screen name for now
+    const SeatsScreen(),
+    const PaymentsScreen(),
+    const MoreScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final navBgColor = isDark ? const Color(0xFF0F172A) : Colors.white; // match deep navy
-    final activeColor = isDark ? const Color(0xFF818CF8) : const Color(0xFF4338CA);
-    final inactiveColor = isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8);
-
     return Scaffold(
       body: _screens[_currentIndex],
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: navBgColor,
-          border: Border(top: BorderSide(color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade200, width: 1)),
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          selectedItemColor: activeColor,
-          unselectedItemColor: inactiveColor,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), activeIcon: Icon(Icons.dashboard_rounded, size: 28), label: 'Home'),
-            BottomNavigationBarItem(icon: Icon(Icons.people_alt_rounded), activeIcon: Icon(Icons.people_alt_rounded, size: 28), label: 'Members'),
-            BottomNavigationBarItem(icon: Icon(Icons.insert_chart_rounded), activeIcon: Icon(Icons.insert_chart_rounded, size: 28), label: 'Reports'),
-            BottomNavigationBarItem(icon: Icon(Icons.settings_rounded), activeIcon: Icon(Icons.settings_rounded, size: 28), label: 'Settings'),
-          ],
-        ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (index) => setState(() => _currentIndex = index),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_outlined),
+            selectedIcon: Icon(Icons.dashboard_rounded),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.people_outline_rounded),
+            selectedIcon: Icon(Icons.people_alt_rounded),
+            label: 'Members',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.chair_alt_outlined),
+            selectedIcon: Icon(Icons.chair_alt_rounded),
+            label: 'Seats',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: Icon(Icons.account_balance_wallet_rounded),
+            label: 'Payments',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.more_horiz_rounded),
+            selectedIcon: Icon(Icons.more_horiz_rounded),
+            label: 'More',
+          ),
+        ],
       ),
     );
   }

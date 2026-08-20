@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../models/student.dart';
+import '../models/member.dart';
 import '../services/api_service.dart';
-import 'add_student_screen.dart';
+import 'add_member_screen.dart';
 
 class MembersScreen extends StatefulWidget {
   const MembersScreen({super.key});
@@ -16,7 +16,7 @@ class MembersScreen extends StatefulWidget {
 }
 
 class _MembersScreenState extends State<MembersScreen> with SingleTickerProviderStateMixin {
-  List<Student> _students = [];
+  List<Member> _members = [];
   bool _isLoading = true;
   String _searchQuery = '';
   String _filter = 'All';
@@ -60,14 +60,14 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
       _businessName = bName;
     });
     await _loadCustomSeats();
-    await _loadStudents();
+    await _loadMembers();
   }
 
-  Future<void> _loadStudents() async {
+  Future<void> _loadMembers() async {
     setState(() => _isLoading = true);
-    final data = await ApiService.getStudentsForUser(_currentUser);
+    final data = await ApiService.getMembersForUser(_currentUser);
     setState(() {
-      _students = data;
+      _members = data;
       _isLoading = false;
     });
   }
@@ -99,38 +99,38 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
   }
 
   // Generate Default Due Fee Message
-  String _generateDueFeeMessage(Student student) {
-    final dueAmt = student.dueAmount > 0 ? student.dueAmount.toInt() : (student.totalFee - student.paidAmount).toInt();
-    return 'Namaste ${student.name} ji 🙏\n\n'
+  String _generateDueFeeMessage(Member member) {
+    final dueAmt = member.dueAmount > 0 ? member.dueAmount.toInt() : (member.totalFee - member.paidAmount).toInt();
+    return 'Namaste ${member.name} ji 🙏\n\n'
         'Aapka library fee due (bakaya) hai. Kripya jaldi se jaldi apni bachi hui fee jama kijye taaki aapki seat reserve rahe.\n\n'
         '📚 *Library:* $_businessName\n'
-        '🪑 *Seat Number:* ${student.seatNumber}\n'
-        '⏰ *Shift / Timing:* ${student.timing}\n'
-        '💰 *Due Amount (बकाया फीस):* ₹${dueAmt > 0 ? dueAmt : student.totalFee.toInt()}\n'
-        '📅 *Valid Till:* ${student.expiryDate}\n'
+        '🪑 *Seat Number:* ${member.seatNumber}\n'
+        '⏰ *Shift / Timing:* ${member.timing}\n'
+        '💰 *Due Amount (बकाया फीस):* ₹${dueAmt > 0 ? dueAmt : member.totalFee.toInt()}\n'
+        '📅 *Valid Till:* ${member.expiryDate}\n'
         '💳 *UPI ID for Payment:* $_upiId\n\n'
         'Kripya fee jama karke payment screenshot bhejein.\n'
         'Dhanyawad! 📖';
   }
 
   // Generate Expiry Renewal Message
-  String _generateExpiryMessage(Student student) {
-    return 'Namaste ${student.name} ji 🙏\n\n'
-        'Aapki library membership ${student.isExpired ? 'EXPIRE ho chuki hai ⚠️' : 'khatam hone wali hai (${student.daysRemaining} din bache hain) ⏳'}.\n\n'
-        'Kripya samay par renewal kar lein taaki aapki Seat ${student.seatNumber} kisi aur ko allot na ho.\n\n'
+  String _generateExpiryMessage(Member member) {
+    return 'Namaste ${member.name} ji 🙏\n\n'
+        'Aapki library membership ${member.isExpired ? 'EXPIRE ho chuki hai ⚠️' : 'khatam hone wali hai (${member.daysRemaining} din bache hain) ⏳'}.\n\n'
+        'Kripya samay par renewal kar lein taaki aapki Seat ${member.seatNumber} kisi aur ko allot na ho.\n\n'
         '📚 *Library:* $_businessName\n'
-        '🪑 *Seat Number:* ${student.seatNumber}\n'
-        '⏰ *Timing:* ${student.timing}\n'
-        '📅 *Expiry Date:* ${student.expiryDate}\n'
+        '🪑 *Seat Number:* ${member.seatNumber}\n'
+        '⏰ *Timing:* ${member.timing}\n'
+        '📅 *Expiry Date:* ${member.expiryDate}\n'
         '💳 *UPI ID:* $_upiId\n\n'
         'Dhanyawad! 📖';
   }
 
   // ================= WHATSAPP INTERFACE MODAL =================
-  void _showWhatsAppSenderModal(Student student) {
-    String currentText = student.dueAmount > 0 
-        ? _generateDueFeeMessage(student) 
-        : _generateExpiryMessage(student);
+  void _showWhatsAppSenderModal(Member member) {
+    String currentText = member.dueAmount > 0 
+        ? _generateDueFeeMessage(member) 
+        : _generateExpiryMessage(member);
     
     final messageCtrl = TextEditingController(text: currentText);
 
@@ -174,7 +174,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text('WhatsApp Notification', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
-                            Text('To: ${student.name} (${student.phone})', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                            Text('To: ${member.name} (${member.phone})', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                           ],
                         ),
                       ],
@@ -196,7 +196,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                         backgroundColor: Colors.amber.shade50,
                         onPressed: () {
                           setModalState(() {
-                            messageCtrl.text = _generateDueFeeMessage(student);
+                            messageCtrl.text = _generateDueFeeMessage(member);
                           });
                         },
                       ),
@@ -209,7 +209,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                         backgroundColor: Colors.indigo.shade50,
                         onPressed: () {
                           setModalState(() {
-                            messageCtrl.text = _generateExpiryMessage(student);
+                            messageCtrl.text = _generateExpiryMessage(member);
                           });
                         },
                       ),
@@ -246,11 +246,11 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                     ),
                     onPressed: () {
                       Navigator.pop(ctx);
-                      _launchWhatsAppMessage(student.phone, messageCtrl.text.trim());
+                      _launchWhatsAppMessage(member.phone, messageCtrl.text.trim());
                     },
                     icon: const Icon(Icons.send_rounded, size: 20),
                     label: Text(
-                      'Open WhatsApp & Send to ${student.name.split(" ").first}',
+                      'Open WhatsApp & Send to ${member.name.split(" ").first}',
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                     ),
                   ),
@@ -265,7 +265,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
 
   // Bulk WhatsApp Reminders Sheet
   void _showBulkWhatsAppModal() {
-    final pending = _students.where((s) => s.isExpired || s.daysRemaining <= 5 || s.dueAmount > 0).toList();
+    final pending = _members.where((s) => s.isExpired || s.daysRemaining <= 5 || s.dueAmount > 0).toList();
 
     showModalBottomSheet(
       context: context,
@@ -297,7 +297,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
             if (pending.isEmpty)
               const Expanded(
                 child: Center(
-                  child: Text('Sabhi students ka payment & validity up to date hai! 🎉', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: Text('Sabhi members ka payment & validity up to date hai! 🎉', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               )
             else
@@ -350,9 +350,9 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
     });
   }
 
-  String _getUpiQrUrl(double amount, String studentName) {
+  String _getUpiQrUrl(double amount, String memberName) {
     final encodedName = Uri.encodeComponent(_businessName);
-    final note = Uri.encodeComponent('Library Fee - $studentName');
+    final note = Uri.encodeComponent('Library Fee - $memberName');
     final upiPayload = 'upi://pay?pa=$_upiId&pn=$encodedName&am=${amount.toInt()}&cu=INR&tn=$note';
     return 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${Uri.encodeComponent(upiPayload)}';
   }
@@ -421,7 +421,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
     );
   }
 
-  void _showQrCodeModal(double amount, String studentName) {
+  void _showQrCodeModal(double amount, String memberName) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -472,7 +472,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                 border: Border.all(color: Colors.grey.shade200),
               ),
               child: Image.network(
-                _getUpiQrUrl(amount, studentName),
+                _getUpiQrUrl(amount, memberName),
                 width: 200,
                 height: 200,
                 fit: BoxFit.contain,
@@ -561,7 +561,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
     for (var s in _seatList) {
       set.add(s.trim().toUpperCase());
     }
-    for (var st in _students) {
+    for (var st in _members) {
       if (st.seatNumber.isNotEmpty) {
         set.add(st.seatNumber.trim().toUpperCase());
       }
@@ -571,9 +571,9 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
     return list;
   }
 
-  Map<String, Student> get _occupiedSeatsMap {
-    final map = <String, Student>{};
-    for (var s in _students) {
+  Map<String, Member> get _occupiedSeatsMap {
+    final map = <String, Member>{};
+    for (var s in _members) {
       if (s.seatNumber.isNotEmpty) {
         map[s.seatNumber.toUpperCase().trim()] = s;
       }
@@ -582,7 +582,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
   }
 
   int get _totalCapacity => _allSeatNumbers.length;
-  int get _occupiedCount => _students.where((s) => !s.isExpired).length;
+  int get _occupiedCount => _members.where((s) => !s.isExpired).length;
   int get _vacantCount => (_totalCapacity - _occupiedCount) > 0 ? (_totalCapacity - _occupiedCount) : 0;
 
   double get _thisMonthCollectedEarnings {
@@ -590,27 +590,27 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
     final currentMonthYear = DateFormat('yyyy-MM').format(now);
 
     double total = 0;
-    for (var s in _students) {
+    for (var s in _members) {
       if (s.admissionDate.startsWith(currentMonthYear)) {
         total += s.paidAmount;
       }
     }
-    if (total == 0 && _students.isNotEmpty) {
-      total = _students.fold(0, (sum, s) => sum + s.paidAmount);
+    if (total == 0 && _members.isNotEmpty) {
+      total = _members.fold(0, (sum, s) => sum + s.paidAmount);
     }
     return total;
   }
 
   double get _totalDueAmount {
-    return _students.fold(0, (sum, s) => sum + s.dueAmount);
+    return _members.fold(0, (sum, s) => sum + s.dueAmount);
   }
 
-  Future<void> _deleteStudent(Student student) async {
+  Future<void> _deleteMember(Member member) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Student?'),
-        content: Text('Kya aap ${student.name} ko database se hatana chahte hain? Seat ${student.seatNumber} khali ho jayegi.'),
+        title: const Text('Delete Member?'),
+        content: Text('Kya aap ${member.name} ko database se hatana chahte hain? Seat ${member.seatNumber} khali ho jayegi.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -625,19 +625,19 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
       ),
     );
 
-    if (confirmed == true && student.id != null) {
-      await ApiService.deleteStudentForUser(_currentUser, student.id!);
-      _loadStudents();
+    if (confirmed == true && member.id != null) {
+      await ApiService.deleteMemberForUser(_currentUser, member.id!);
+      _loadMembers();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${student.name} deleted & Seat ${student.seatNumber} is now vacant!')),
+          SnackBar(content: Text('${member.name} deleted & Seat ${member.seatNumber} is now vacant!')),
         );
       }
     }
   }
 
   // ================= SMART EDIT STUDENT & COLLECT DUE FEE MODAL =================
-  void _showEditStudentModal(Student s) {
+  void _showEditMemberModal(Member s) {
     final nameCtrl = TextEditingController(text: s.name);
     final phoneCtrl = TextEditingController(text: s.phone);
     final seatCtrl = TextEditingController(text: s.seatNumber);
@@ -823,14 +823,14 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                   ),
                   const SizedBox(height: 12),
 
-                  // Student Name & Mobile
+                  // Member Name & Mobile
                   Row(
                     children: [
                       Expanded(
                         child: TextField(
                           controller: nameCtrl,
                           decoration: InputDecoration(
-                            labelText: 'Student Name',
+                            labelText: 'Member Name',
                             prefixIcon: const Icon(Icons.person_rounded, size: 18),
                             filled: true,
                             fillColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
@@ -950,12 +950,12 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                         if (finalPaid <= 0) st = 'Due';
                         else if (finalDue > 0) st = 'Partial';
 
-                        final updatedStudent = Student(
+                        final updatedMember = Member(
                           id: s.id,
                           name: nameCtrl.text.trim(),
                           phone: phoneCtrl.text.trim(),
-                          admissionDate: s.admissionDate,
-                          timing: selectedTiming,
+                          joiningDate: s.admissionDate,
+                          startDate: s.admissionDate,
                           seatNumber: seatCtrl.text.trim().toUpperCase(),
                           expiryDate: dateFormat.format(expiryDate),
                           totalFee: finalTot,
@@ -965,14 +965,14 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                           paymentStatus: st,
                         );
 
-                        await ApiService.updateStudentForUser(_currentUser, updatedStudent);
+                        await ApiService.updateMemberForUser(_currentUser, updatedMember);
                         Navigator.pop(ctx);
-                        _loadStudents();
+                        _loadMembers();
 
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('✅ ${updatedStudent.name} updated! (Paid: ₹${finalPaid.toInt()}, Due: ₹${finalDue.toInt()})'),
+                              content: Text('✅ ${updatedMember.name} updated! (Paid: ₹${finalPaid.toInt()}, Due: ₹${finalDue.toInt()})'),
                               backgroundColor: Colors.green.shade700,
                             ),
                           );
@@ -1114,8 +1114,8 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
     );
   }
 
-  List<Student> get _filteredStudents {
-    return _students.where((s) {
+  List<Member> get _filteredMembers {
+    return _members.where((s) {
       final matchesSearch = s.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           s.seatNumber.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           s.phone.contains(_searchQuery);
@@ -1131,7 +1131,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
-    final totalCount = _students.length;
+    final totalCount = _members.length;
     final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
     return Scaffold(
@@ -1204,7 +1204,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
           IconButton(
             tooltip: 'Refresh',
             icon: const Icon(Icons.refresh_rounded),
-            onPressed: _loadStudents,
+            onPressed: _loadMembers,
           ),
           IconButton(
             tooltip: 'Logout',
@@ -1228,7 +1228,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
           tabs: [
             Tab(
               icon: const Icon(Icons.people_alt_rounded, size: 20),
-              text: 'Students ($totalCount)',
+              text: 'Members ($totalCount)',
             ),
             Tab(
               icon: const Icon(Icons.event_seat_rounded, size: 20),
@@ -1240,7 +1240,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildStudentsTab(currencyFormat),
+          _buildMembersTab(currencyFormat),
           _buildSeatMapTab(),
         ],
       ),
@@ -1248,20 +1248,20 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
         onPressed: () async {
           final added = await Navigator.push<bool>(
             context,
-            MaterialPageRoute(builder: (context) => const AddStudentScreen()),
+            MaterialPageRoute(builder: (context) => const AddMemberScreen()),
           );
-          if (added == true) _loadStudents();
+          if (added == true) _loadMembers();
         },
         backgroundColor: const Color(0xFF4338CA),
         foregroundColor: Colors.white,
         icon: const Icon(Icons.person_add_rounded),
-        label: const Text('Add Student', style: TextStyle(fontWeight: FontWeight.bold)),
+        label: const Text('Add Member', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }
 
   // ================= TAB 1: STUDENTS TAB =================
-  Widget _buildStudentsTab(NumberFormat currencyFormat) {
+  Widget _buildMembersTab(NumberFormat currencyFormat) {
     return Column(
       children: [
         // 2. Search & Filter Bar
@@ -1277,7 +1277,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                   color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF0F172A),
                 ),
                 decoration: InputDecoration(
-                  hintText: 'Search by student name, seat, mobile...',
+                  hintText: 'Search by member name, seat, mobile...',
                   hintStyle: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
@@ -1344,11 +1344,11 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
           ),
         ),
 
-        // 3. Students List
+        // 3. Members List
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : _filteredStudents.isEmpty
+              : _filteredMembers.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -1357,22 +1357,22 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                           const SizedBox(height: 10),
                           Text(
                             _searchQuery.isNotEmpty
-                                ? 'No student matches your search'
-                                : 'No students found for $_currentUser',
+                                ? 'No member matches your search'
+                                : 'No members found for $_currentUser',
                             style: TextStyle(color: Colors.grey.shade700, fontSize: 15, fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 4),
-                          Text('Click "+ Add Student" to register & assign seat!', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+                          Text('Click "+ Add Member" to register & assign seat!', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
                         ],
                       ),
                     )
                   : RefreshIndicator(
-                      onRefresh: _loadStudents,
+                      onRefresh: _loadMembers,
                       child: ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                        itemCount: _filteredStudents.length,
+                        itemCount: _filteredMembers.length,
                         itemBuilder: (context, idx) {
-                          final s = _filteredStudents[idx];
+                          final s = _filteredMembers[idx];
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),
                             shape: RoundedRectangleBorder(
@@ -1388,7 +1388,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                             color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.white,
                             child: InkWell(
                               borderRadius: BorderRadius.circular(16),
-                              onTap: () => _showEditStudentModal(s),
+                              onTap: () => _showEditMemberModal(s),
                               child: Padding(
                                 padding: const EdgeInsets.all(12),
                                 child: Column(
@@ -1436,7 +1436,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                                         ),
                                         const SizedBox(width: 12),
 
-                                        // Student Info
+                                        // Member Info
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1555,8 +1555,8 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                                                   icon: Icon(Icons.delete_outline_rounded, color: Colors.red.shade400, size: 20),
                                                   padding: EdgeInsets.zero,
                                                   constraints: const BoxConstraints(),
-                                                  tooltip: 'Delete Student',
-                                                  onPressed: () => _deleteStudent(s),
+                                                  tooltip: 'Delete Member',
+                                                  onPressed: () => _deleteMember(s),
                                                 ),
                                               ],
                                             ),
@@ -1602,7 +1602,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                                                   icon: const Icon(Icons.qr_code_2_rounded, color: Color(0xFF4338CA), size: 22),
                                                   padding: EdgeInsets.zero,
                                                   constraints: const BoxConstraints(),
-                                                  tooltip: 'Show UPI QR Code to Student',
+                                                  tooltip: 'Show UPI QR Code to Member',
                                                   onPressed: () => _showQrCodeModal(s.dueAmount, s.name),
                                                 ),
                                                 const SizedBox(width: 8),
@@ -1617,7 +1617,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                                                   minimumSize: Size.zero,
                                                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                                 ),
-                                                onPressed: () => _showEditStudentModal(s),
+                                                onPressed: () => _showEditMemberModal(s),
                                                 icon: const Icon(Icons.edit_note_rounded, size: 16),
                                                 label: Text(
                                                   s.dueAmount > 0 ? 'Edit / फीस जमा करें' : 'Edit Details',
@@ -1748,8 +1748,8 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
             itemBuilder: (context, index) {
               final seatNo = allSeats[index];
               final isOccupied = seatMap.containsKey(seatNo);
-              final student = seatMap[seatNo];
-              final isExpired = student != null && student.isExpired;
+              final member = seatMap[seatNo];
+              final isExpired = member != null && member.isExpired;
 
               // Theme Colors for Study Desk
               Color deskColor;
@@ -1774,7 +1774,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                 textCol = isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B);
                 chairColor = const Color(0xFFEF4444);
                 deskIcon = Icons.timer_outlined;
-                statusLabel = student?.name.split(' ').first ?? 'Expired';
+                statusLabel = member?.name.split(' ').first ?? 'Expired';
               } else {
                 // Active Occupied Desk
                 deskColor = const Color(0xFF6366F1);
@@ -1782,13 +1782,13 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                 textCol = isDark ? const Color(0xFFA5B4FC) : const Color(0xFF3730A3);
                 chairColor = const Color(0xFF6366F1);
                 deskIcon = Icons.school_rounded;
-                statusLabel = student?.name.split(' ').first ?? 'Occupied';
+                statusLabel = member?.name.split(' ').first ?? 'Occupied';
               }
 
               return InkWell(
                 onTap: () {
-                  if (isOccupied && student != null) {
-                    _showSeatStudentDetails(seatNo, student);
+                  if (isOccupied && member != null) {
+                    _showSeatMemberDetails(seatNo, member);
                   } else {
                     _showBookSeatDialog(seatNo);
                   }
@@ -1842,14 +1842,14 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                                 ),
                               ),
 
-                              // Study Symbol (Book / Student studying / Lamp)
+                              // Study Symbol (Book / Member studying / Lamp)
                               Icon(
                                 deskIcon,
                                 size: 22,
                                 color: deskColor,
                               ),
 
-                              // Student Name or Vacant Status
+                              // Member Name or Vacant Status
                               Text(
                                 statusLabel,
                                 style: TextStyle(
@@ -1915,7 +1915,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
     );
   }
 
-  void _showSeatStudentDetails(String seatNo, Student student) {
+  void _showSeatMemberDetails(String seatNo, Member member) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -1937,8 +1937,8 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(student.name, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-                      Text('Seat: $seatNo • ${student.timing}', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                      Text(member.name, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                      Text('Seat: $seatNo • ${member.timing}', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
                     ],
                   ),
                 ),
@@ -1948,25 +1948,25 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Mobile: ${student.phone}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                Text('Fee: ₹${student.totalFee.toInt()} (Paid: ₹${student.paidAmount.toInt()})', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
+                Text('Mobile: ${member.phone}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text('Fee: ₹${member.totalFee.toInt()} (Paid: ₹${member.paidAmount.toInt()})', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
               ],
             ),
-            if (student.dueAmount > 0) ...[
+            if (member.dueAmount > 0) ...[
               const SizedBox(height: 4),
-              Text('Pending Due: ₹${student.dueAmount.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+              Text('Pending Due: ₹${member.dueAmount.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
             ],
             const SizedBox(height: 6),
-            Text('Expires on: ${student.expiryDate} (${student.daysRemaining} days left)', style: TextStyle(color: student.isExpired ? Colors.red : Colors.grey.shade700)),
+            Text('Expires on: ${member.expiryDate} (${member.daysRemaining} days left)', style: TextStyle(color: member.isExpired ? Colors.red : Colors.grey.shade700)),
             const SizedBox(height: 16),
             Row(
               children: [
-                if (student.dueAmount > 0) ...[
+                if (member.dueAmount > 0) ...[
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () {
                         Navigator.pop(ctx);
-                        _showQrCodeModal(student.dueAmount, student.name);
+                        _showQrCodeModal(member.dueAmount, member.name);
                       },
                       icon: const Icon(Icons.qr_code_rounded, size: 18),
                       label: const Text('UPI QR'),
@@ -1978,7 +1978,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(ctx);
-                      _showEditStudentModal(student);
+                      _showEditMemberModal(member);
                     },
                     icon: const Icon(Icons.edit_note_rounded, size: 18),
                     label: const Text('Edit / Fees'),
@@ -1990,7 +1990,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(ctx);
-                      _showWhatsAppSenderModal(student);
+                      _showWhatsAppSenderModal(member);
                     },
                     icon: const Icon(Icons.chat_rounded, size: 18),
                     label: const Text('WhatsApp'),
@@ -2017,7 +2017,7 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
             Text('Seat $seatNo Khali Hai!'),
           ],
         ),
-        content: Text('Kya aap Seat $seatNo par naye student ko register karna chahte hain?'),
+        content: Text('Kya aap Seat $seatNo par naye member ko register karna chahte hain?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
@@ -2026,9 +2026,9 @@ class _MembersScreenState extends State<MembersScreen> with SingleTickerProvider
               Navigator.pop(ctx);
               final added = await Navigator.push<bool>(
                 context,
-                MaterialPageRoute(builder: (context) => const AddStudentScreen()),
+                MaterialPageRoute(builder: (context) => const AddMemberScreen()),
               );
-              if (added == true) _loadStudents();
+              if (added == true) _loadMembers();
             },
             child: const Text('Assign This Seat'),
           ),

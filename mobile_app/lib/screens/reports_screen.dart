@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/student.dart';
+import '../models/member.dart';
 import '../services/api_service.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -39,16 +39,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final prefs = await SharedPreferences.getInstance();
     _currentUser = prefs.getString('current_logged_in_user') ?? 'kushbinary';
 
-    final students = await ApiService.getStudentsForUser(_currentUser);
-    _calculateReports(students);
+    final members = await ApiService.getMembersForUser(_currentUser);
+    _calculateReports(members);
   }
 
-  void _calculateReports(List<Student> students) {
-    Map<String, List<Student>> grouped = {};
+  void _calculateReports(List<Member> members) {
+    Map<String, List<Member>> grouped = {};
 
-    for (var s in students) {
+    for (var s in members) {
       try {
-        DateTime admissionDate = DateTime.parse(s.admissionDate);
+        DateTime admissionDate = DateTime.parse(s.joiningDate);
         String monthYear = DateFormat('MMMM yyyy').format(admissionDate); // e.g., "August 2026"
         
         if (!grouped.containsKey(monthYear)) {

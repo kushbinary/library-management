@@ -1,14 +1,21 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:intl/intl.dart';
-import '../models/student.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/member.dart';
+import '../models/membership_plan.dart';
+import '../models/payment.dart';
+import '../models/attendance.dart';
+import '../models/expense.dart';
+import '../models/seat.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   static Database? _database;
-  static const _dbName = "library.db";
+  static const _dbName = "mylibbook_v2.db";
   static const _dbVersion = 1;
 
   DatabaseHelper._internal();
@@ -29,63 +36,209 @@ class DatabaseHelper {
     return await openDatabase(
       path,
       version: _dbVersion,
-      onCreate: (db, version) async {
-        await db.execute('''
-          CREATE TABLE IF NOT EXISTS students (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT NOT NULL,
-            phone TEXT NOT NULL,
-            admissionDate TEXT NOT NULL,
-            timing TEXT NOT NULL,
-            seatNumber TEXT NOT NULL,
-            expiryDate TEXT NOT NULL
-          )
-        ''');
-      },
+      onCreate: _onCreate,
     );
   }
 
-  // Add a new student
-  Future<int> insertStudent(Student student) async {
-    final db = await database;
-    return await db.insert('students', student.toJson(),
-        conflictAlgorithm: ConflictAlgorithm.replace);
+  Future<void> _onCreate(Database db, int version) async {
+    await db.execute('''
+      CREATE TABLE members (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        whatsapp TEXT,
+        email TEXT,
+        address TEXT,
+        joining_date TEXT NOT NULL,
+        plan_id TEXT,
+        start_date TEXT NOT NULL,
+        expiry_date TEXT NOT NULL,
+        seat_number TEXT,
+        status TEXT,
+        notes TEXT,
+        profile_photo TEXT,
+        total_fee REAL,
+        paid_amount REAL,
+        due_amount REAL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE membership_plans (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        duration_days INTEGER NOT NULL,
+        price REAL NOT NULL,
+        late_fine REAL,
+        grace_period_days INTEGER,
+        description TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE payments (
+        id TEXT PRIMARY KEY,
+        member_id TEXT NOT NULL,
+        amount REAL NOT NULL,
+        date TEXT NOT NULL,
+        method TEXT,
+        type TEXT,
+        status TEXT,
+        transaction_id TEXT,
+        notes TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE attendance (
+        id TEXT PRIMARY KEY,
+        member_id TEXT NOT NULL,
+        date TEXT NOT NULL,
+        check_in_time TEXT NOT NULL,
+        check_out_time TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE expenses (
+        id TEXT PRIMARY KEY,
+        category TEXT NOT NULL,
+        amount REAL NOT NULL,
+        date TEXT NOT NULL,
+        payment_method TEXT,
+        description TEXT,
+        notes TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE seats (
+        id TEXT PRIMARY KEY,
+        seat_number TEXT NOT NULL,
+        status TEXT,
+        assigned_member_id TEXT
+      )
+    ''');
+
+    // Run migration after creating tables
+    await _migrateOldData(db);
   }
 
-  // Get all students
-  Future<List<Student>> getAllStudents() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('students');
-    return List.generate(maps.length, (i) {
-      return Student.fromJson(maps[i]);
-    });
+  Future<void> _migrateOldData(Database db) async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool migrated = prefs.getBool('data_migrated_v2') ?? false;
+    
+    if (migrated) return;
+
+    final user = prefs.getString('current_logged_in_user') ?? 'admin';
+    final key = 'library_students_user_\${user.toLowerCase().trim()}';
+    
+    final raw = prefs.getString(key);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final List<dynamic> oldStudents = json.decode(raw);
+        for (var item in oldStudents) {
+          final member = Member.fromJson(item);
+          await db.insert('members', member.toJson(), conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+      } catch (e) {
+        print("Migration error: \$e");
+      }
+    }
+    
+    await prefs.setBool('data_migrated_v2', true);
   }
 
-  // Get students with expired memberships
-  Future<List<Student>> getExpiredStudents() async {
+  // ---- MEMBER OPERATIONS ----
+  Future<int> insertMember(Member member) async {
     final db = await database;
-    final now = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final List<Map<String, dynamic>> maps = await db.query(
-      'students',
-      where: 'expiryDate <= ?',
-      whereArgs: [now],
-    );
-    return List.generate(maps.length, (i) {
-      return Student.fromJson(maps[i]);
-    });
+    return await db.insert('members', member.toJson(), conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  // Update a student
-  Future<int> updateStudent(Student student) async {
+  Future<List<Member>> getAllMembers() async {
     final db = await database;
-    return await db.update('students', student.toJson(),
-        where: 'id = ?', whereArgs: [student.id]);
+    final maps = await db.query('members');
+    return maps.map((e) => Member.fromJson(e)).toList();
   }
 
-  // Delete a student
-  Future<int> deleteStudent(int id) async {
+  Future<int> updateMember(Member member) async {
     final db = await database;
-    return await db.delete('students', where: 'id = ?', whereArgs: [id]);
+    return await db.update('members', member.toJson(), where: 'id = ?', whereArgs: [member.id]);
+  }
+
+  Future<int> deleteMember(String id) async {
+    final db = await database;
+    return await db.delete('members', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ---- MEMBERSHIP PLAN OPERATIONS ----
+  Future<int> insertMembershipPlan(MembershipPlan plan) async {
+    final db = await database;
+    return await db.insert('membership_plans', plan.toJson(), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<MembershipPlan>> getAllMembershipPlans() async {
+    final db = await database;
+    final maps = await db.query('membership_plans');
+    return maps.map((e) => MembershipPlan.fromJson(e)).toList();
+  }
+
+  // ---- PAYMENT OPERATIONS ----
+  Future<int> insertPayment(Payment payment) async {
+    final db = await database;
+    return await db.insert('payments', payment.toJson(), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<Payment>> getAllPayments() async {
+    final db = await database;
+    final maps = await db.query('payments');
+    return maps.map((e) => Payment.fromJson(e)).toList();
+  }
+  
+  Future<List<Payment>> getPaymentsForMember(String memberId) async {
+    final db = await database;
+    final maps = await db.query('payments', where: 'member_id = ?', whereArgs: [memberId]);
+    return maps.map((e) => Payment.fromJson(e)).toList();
+  }
+
+  // ---- ATTENDANCE OPERATIONS ----
+  Future<int> insertAttendance(Attendance attendance) async {
+    final db = await database;
+    return await db.insert('attendance', attendance.toJson(), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<Attendance>> getAttendanceByDate(String date) async {
+    final db = await database;
+    final maps = await db.query('attendance', where: 'date = ?', whereArgs: [date]);
+    return maps.map((e) => Attendance.fromJson(e)).toList();
+  }
+
+  // ---- EXPENSE OPERATIONS ----
+  Future<int> insertExpense(Expense expense) async {
+    final db = await database;
+    return await db.insert('expenses', expense.toJson(), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<Expense>> getAllExpenses() async {
+    final db = await database;
+    final maps = await db.query('expenses');
+    return maps.map((e) => Expense.fromJson(e)).toList();
+  }
+
+  // ---- SEAT OPERATIONS ----
+  Future<int> insertSeat(Seat seat) async {
+    final db = await database;
+    return await db.insert('seats', seat.toJson(), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<Seat>> getAllSeats() async {
+    final db = await database;
+    final maps = await db.query('seats');
+    return maps.map((e) => Seat.fromJson(e)).toList();
+  }
+  
+  Future<int> updateSeat(Seat seat) async {
+    final db = await database;
+    return await db.update('seats', seat.toJson(), where: 'id = ?', whereArgs: [seat.id]);
   }
 }

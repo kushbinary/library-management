@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../models/student.dart';
+import '../models/member.dart';
 import '../services/api_service.dart';
 
-class AddStudentScreen extends StatefulWidget {
-  const AddStudentScreen({super.key});
+class AddMemberScreen extends StatefulWidget {
+  const AddMemberScreen({super.key});
 
   @override
-  State<AddStudentScreen> createState() => _AddStudentScreenState();
+  State<AddMemberScreen> createState() => _AddMemberScreenState();
 }
 
-class _AddStudentScreenState extends State<AddStudentScreen> {
+class _AddMemberScreenState extends State<AddMemberScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -80,9 +80,9 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   }
 
   // Dynamic UPI URL for QR generation
-  String _getUpiQrUrl(double amount, String studentName) {
+  String _getUpiQrUrl(double amount, String memberName) {
     final encodedName = Uri.encodeComponent(_businessName);
-    final note = Uri.encodeComponent('Library Fee - $studentName');
+    final note = Uri.encodeComponent('Library Fee - $memberName');
     final upiPayload = 'upi://pay?pa=$_upiId&pn=$encodedName&am=${amount.toInt()}&cu=INR&tn=$note';
     return 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${Uri.encodeComponent(upiPayload)}';
   }
@@ -169,7 +169,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   }
 
   // QR Code Fullscreen Popup
-  void _showQrCodeModal(double amount, String studentName) {
+  void _showQrCodeModal(double amount, String memberName) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -221,7 +221,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                 border: Border.all(color: Colors.grey.shade200),
               ),
               child: Image.network(
-                _getUpiQrUrl(amount, studentName),
+                _getUpiQrUrl(amount, memberName),
                 width: 200,
                 height: 200,
                 fit: BoxFit.contain,
@@ -305,7 +305,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
     final prefs = await SharedPreferences.getInstance();
     final currentUser = prefs.getString('current_logged_in_user') ?? 'kushbinary';
 
-    final student = Student(
+    final member = Member(
       name: _nameController.text.trim(),
       phone: _phoneController.text.trim(),
       admissionDate: DateFormat('yyyy-MM-dd').format(_admissionDate),
@@ -319,7 +319,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
       paymentStatus: _paymentStatus,
     );
 
-    final success = await ApiService.addStudentForUser(currentUser, student);
+    final success = await ApiService.addMemberForUser(currentUser, member);
 
     setState(() => _isLoading = false);
 
@@ -336,7 +336,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                 Text('Success'),
               ],
             ),
-            content: Text('${student.name} has been added successfully!\nWould you like to send a welcome message?'),
+            content: Text('${member.name} has been added successfully!\nWould you like to send a welcome message?'),
             actions: [
               TextButton(
                 onPressed: () {
@@ -347,7 +347,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
               ),
               ElevatedButton.icon(
                 onPressed: () async {
-                  await _launchWhatsAppWelcome(student);
+                  await _launchWhatsAppWelcome(member);
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (context.mounted) Navigator.pop(context, true);
                 },
@@ -364,7 +364,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to add student. Please try again.'),
+            content: Text('Failed to add member. Please try again.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -373,13 +373,13 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   }
 
 
-  Future<void> _launchWhatsAppWelcome(Student student) async {
+  Future<void> _launchWhatsAppWelcome(Member member) async {
     final prefs = await SharedPreferences.getInstance();
     final libraryName = prefs.getString('library_custom_business_name') ?? 'MyLibBook';
     
-    final message = "Hello ${student.name},\n\nWelcome to $libraryName! 🎉\n\nYour admission is confirmed.\nSeat Number: ${student.seatNumber}\nValid Until: ${student.expiryDate}\nTotal Fee: ₹${student.totalFee.toInt()}\nPaid: ₹${student.paidAmount.toInt()}\nDue: ₹${student.dueAmount.toInt()}\n\nThank you for choosing us!";
+    final message = "Hello ${member.name},\n\nWelcome to $libraryName! 🎉\n\nYour admission is confirmed.\nSeat Number: ${member.seatNumber}\nValid Until: ${member.expiryDate}\nTotal Fee: ₹${member.totalFee.toInt()}\nPaid: ₹${member.paidAmount.toInt()}\nDue: ₹${member.dueAmount.toInt()}\n\nThank you for choosing us!";
     
-    String cleanPhone = student.phone.replaceAll(RegExp(r'[^0-9]'), '');
+    String cleanPhone = member.phone.replaceAll(RegExp(r'[^0-9]'), '');
     if (cleanPhone.length == 10) {
       cleanPhone = '91$cleanPhone';
     }
@@ -408,7 +408,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text(
-          'Add New Student',
+          'Add New Member',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         backgroundColor: isDark ? const Color(0xFF1E1B4B) : const Color(0xFF4338CA),
@@ -429,9 +429,9 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1. Basic Student Info Card
+              // 1. Basic Member Info Card
               _buildSectionCard(
-                title: 'Student Details',
+                title: 'Member Details',
                 icon: Icons.person_outline_rounded,
                 isDark: isDark,
                 child: Column(
@@ -440,13 +440,13 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                       controller: _nameController,
                       style: inputTextStyle,
                       decoration: _inputDecoration(
-                        label: 'Student Full Name *',
+                        label: 'Member Full Name *',
                         hint: 'e.g. Rahul Sharma',
                         icon: Icons.person_rounded,
                         isDark: isDark,
                       ),
                       validator: (value) =>
-                          value == null || value.trim().isEmpty ? 'Please enter student name' : null,
+                          value == null || value.trim().isEmpty ? 'Please enter member name' : null,
                     ),
                     const SizedBox(height: 14),
                     TextFormField(
@@ -683,7 +683,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                               ),
                               onPressed: () => _showQrCodeModal(
                                 _paidAmount,
-                                _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'Student',
+                                _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'Member',
                               ),
                               icon: const Icon(Icons.qr_code_rounded, size: 18),
                               label: const Text('Show QR Code', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
@@ -794,7 +794,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                         )
                       : const Icon(Icons.person_add_alt_1_rounded, size: 22),
                   label: Text(
-                    _isLoading ? 'Registering Student...' : 'Register Student & Assign Seat',
+                    _isLoading ? 'Registering Member...' : 'Register Member & Assign Seat',
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
