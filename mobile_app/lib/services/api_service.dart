@@ -62,7 +62,7 @@ class ApiService {
       }
       return {'success': false, 'error': data['error'] ?? 'Sign Up failed.'};
     } catch (e) {
-      return {'success': false, 'error': 'Server connection failed: \$e'};
+      return {'success': false, 'error': 'Server connection failed: $e'};
     }
   }
 
@@ -94,7 +94,7 @@ class ApiService {
       }
       return {'success': false, 'error': data['error'] ?? 'Invalid credentials'};
     } catch (e) {
-      return {'success': false, 'error': 'Server connection failed: \$e'};
+      return {'success': false, 'error': 'Server connection failed: $e'};
     }
   }
 

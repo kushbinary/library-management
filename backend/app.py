@@ -143,19 +143,19 @@ def init_db():
         # Ensure new columns exist in case of pre-existing tables
         with db.engine.connect() as conn:
             migration_statements = [
-                "ALTER TABLE students ADD COLUMN IF NOT EXISTS user_id INTEGER;",
-                "ALTER TABLE students ADD COLUMN IF NOT EXISTS total_fee FLOAT DEFAULT 1000.0;",
-                "ALTER TABLE students ADD COLUMN IF NOT EXISTS paid_amount FLOAT DEFAULT 1000.0;",
-                "ALTER TABLE students ADD COLUMN IF NOT EXISTS due_amount FLOAT DEFAULT 0.0;",
-                "ALTER TABLE students ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(50) DEFAULT 'UPI';",
-                "ALTER TABLE students ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50) DEFAULT 'Paid';",
-                "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS library_name VARCHAR(120) DEFAULT 'My Library';",
-                "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS email VARCHAR(120) DEFAULT '';",
-                "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS phone VARCHAR(20) DEFAULT '';"
+                ("students", "user_id", "INTEGER"),
+                ("students", "total_fee", "FLOAT DEFAULT 1000.0"),
+                ("students", "paid_amount", "FLOAT DEFAULT 1000.0"),
+                ("students", "due_amount", "FLOAT DEFAULT 0.0"),
+                ("students", "payment_mode", "VARCHAR(50) DEFAULT 'UPI'"),
+                ("students", "payment_status", "VARCHAR(50) DEFAULT 'Paid'"),
+                ("admin_users", "library_name", "VARCHAR(120) DEFAULT 'My Library'"),
+                ("admin_users", "email", "VARCHAR(120) DEFAULT ''"),
+                ("admin_users", "phone", "VARCHAR(20) DEFAULT ''")
             ]
-            for stmt in migration_statements:
+            for table, col, dtype in migration_statements:
                 try:
-                    conn.execute(db.text(stmt))
+                    conn.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {dtype};"))
                     conn.commit()
                 except Exception:
                     pass
