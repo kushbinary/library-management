@@ -158,7 +158,7 @@ def init_db():
                     conn.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {dtype};"))
                     conn.commit()
                 except Exception:
-                    pass
+                    conn.rollback()
 
         # Create default admin account if not already created
         default_admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
