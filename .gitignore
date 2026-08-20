@@ -1,3 +1,13 @@
+# ========================
+# Environment & Secrets
+# ========================
+.env
+.env.local
+.env.production
+.env.*.local
+*.pem
+*.key
+
 # Python / Flask
 venv/
 myenv/
@@ -18,11 +28,25 @@ mobile_app/.dart_tool/
 mobile_app/.flutter-plugins
 mobile_app/.flutter-plugins-dependencies
 
+# Node.js
+node_modules/
+.wwebjs_auth/
+.wwebjs_cache/
+package-lock.json
+
 # IDEs & System
 .vscode/
 .idea/
 .DS_Store
+Thumbs.db
 *.log
+*.swp
+*.swo
+*~
 
-# Ignore APKs
+# Ignore APKs (large binaries)
 *.apk
+
+# Database files
+*.sqlite3
+backend/library.db

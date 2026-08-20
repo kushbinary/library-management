@@ -8,7 +8,7 @@ services:
       - key: PYTHON_VERSION
         value: 3.10.0
       - key: DATABASE_URL
-        value: "postgresql://neondb_owner:npg_R3U5pJBCkqgL@ep-misty-haze-ax48ejk2.c-4.us-east-2.aws.neon.tech/neondb?sslmode=require"
+        sync: false  # SET VIA RENDER DASHBOARD — never commit database credentials to code
       - key: SECRET_KEY
         generateValue: true
       - key: TWILIO_ACCOUNT_SID

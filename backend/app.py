@@ -21,7 +21,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 # ----------------- App Configuration -----------------
 app = Flask(__name__, template_folder='templates', static_folder='static')
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'library-secret-key-cloud-2026')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(32).hex())
 
 # Database configuration: Cloud PostgreSQL or SQLite fallback
 database_url = os.environ.get('DATABASE_URL')
@@ -45,6 +45,7 @@ TWILIO_WHATSAPP_NUMBER = os.environ.get('TWILIO_WHATSAPP_NUMBER', 'whatsapp:+141
 ADMIN_PHONE_NUMBER = os.environ.get('ADMIN_PHONE_NUMBER', 'whatsapp:+919999999999')
 
 LIBRARY_CONFIG = {'total_seats': 50}
+MAX_PASSWORD_LENGTH = 128  # Prevent Long Password DoS on heavy hashing algorithms
 
 # ==================== Database Models ====================
 
@@ -305,6 +306,10 @@ def signup():
             flash('Password must be at least 4 characters long.', 'danger')
             return render_template('signup.html')
 
+        if len(password) > MAX_PASSWORD_LENGTH:
+            flash(f'Password must not exceed {MAX_PASSWORD_LENGTH} characters.', 'danger')
+            return render_template('signup.html')
+
         if AdminUser.query.filter_by(username=username).first():
             flash('Username already exists. Please choose another or Login.', 'warning')
             return render_template('signup.html')
@@ -335,7 +340,10 @@ def login():
             session['user_id'] = user.id
             session['library_name'] = user.library_name or 'My Library'
             flash(f'Welcome back, {user.username}!', 'success')
+            # Open redirect protection: only allow relative paths
             next_page = request.form.get('next') or url_for('student_list')
+            if not next_page.startswith('/') or next_page.startswith('//'):
+                next_page = url_for('student_list')
             return redirect(next_page)
         else:
             flash('Invalid username or password. Please try again.', 'danger')
@@ -371,6 +379,10 @@ def change_password():
 
         if len(new_password) < 4:
             flash('Password must be at least 4 characters long.', 'warning')
+            return render_template('change_password.html')
+
+        if len(new_password) > MAX_PASSWORD_LENGTH:
+            flash(f'Password must not exceed {MAX_PASSWORD_LENGTH} characters.', 'warning')
             return render_template('change_password.html')
 
         user.set_password(new_password)
@@ -516,6 +528,9 @@ def api_signup():
     if len(password) < 4:
         return jsonify({'success': False, 'error': 'Password must be at least 4 characters long'}), 400
 
+    if len(password) > MAX_PASSWORD_LENGTH:
+        return jsonify({'success': False, 'error': f'Password must not exceed {MAX_PASSWORD_LENGTH} characters'}), 400
+
     if AdminUser.query.filter_by(username=username).first():
         return jsonify({'success': False, 'error': 'Username is already taken. Please choose another or login.'}), 409
 
@@ -549,6 +564,32 @@ def api_login():
             'user_id': user.id
         }), 200
     return jsonify({'success': False, 'error': 'Invalid username or password'}), 401
+
+
+@app.route('/api/change-password', methods=['POST'])
+def api_change_password():
+    """API endpoint for mobile app password change."""
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    current_password = data.get('current_password', '').strip()
+    new_password = data.get('new_password', '').strip()
+
+    if not username or not current_password or not new_password:
+        return jsonify({'success': False, 'error': 'Username, current password, and new password are required'}), 400
+
+    if len(new_password) < 6:
+        return jsonify({'success': False, 'error': 'New password must be at least 6 characters long'}), 400
+
+    if len(new_password) > MAX_PASSWORD_LENGTH:
+        return jsonify({'success': False, 'error': f'Password must not exceed {MAX_PASSWORD_LENGTH} characters'}), 400
+
+    user = AdminUser.query.filter_by(username=username).first()
+    if not user or not user.check_password(current_password):
+        return jsonify({'success': False, 'error': 'Current password is incorrect'}), 401
+
+    user.set_password(new_password)
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Password changed successfully'}), 200
 
 
 @app.route('/api/students', methods=['GET'])
@@ -677,4 +718,5 @@ def cron_send_expired_notifications():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    is_prod = os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RENDER')
+    app.run(host='0.0.0.0', port=5000, debug=not is_prod)

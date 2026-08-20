@@ -2,10 +2,11 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
 const express = require('express');
+require('dotenv').config();
 
 const app = express();
 
-app.use(express.json({ limit: '200mb' }));
+app.use(express.json({ limit: '1mb' }));
 
 /*
 |--------------------------------------------------------------------------
@@ -14,7 +15,7 @@ app.use(express.json({ limit: '200mb' }));
 */
 
 const N8N_WEBHOOK =
-    'http://localhost:5678/webhook/auto-reply';
+    process.env.N8N_WEBHOOK || 'http://localhost:5678/webhook/auto-reply';
 
 /*
 |--------------------------------------------------------------------------
@@ -236,7 +237,7 @@ client.on('message', async (msg) => {
             await chat.getContact();
 
         const TARGET_CONTACT =
-            ['919', '170', '717', '240'].join('');
+            process.env.TARGET_CONTACT || '';
         if (
             contact.id?.user !== TARGET_CONTACT
         ) {

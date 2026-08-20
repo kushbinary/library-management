@@ -8,7 +8,8 @@ import '../services/whatsapp_service.dart';
 
 class AddMemberScreen extends StatefulWidget {
   final Member? member;
-  const AddMemberScreen({super.key, this.member});
+  final String? prefilledSeat;
+  const AddMemberScreen({super.key, this.member, this.prefilledSeat});
 
   @override
   State<AddMemberScreen> createState() => _AddMemberScreenState();
@@ -44,7 +45,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
     final m = widget.member;
     _nameCtrl = TextEditingController(text: m?.name ?? '');
     _phoneCtrl = TextEditingController(text: m?.phone ?? '');
-    _seatCtrl = TextEditingController(text: m?.seatNumber ?? '');
+    _seatCtrl = TextEditingController(text: m?.seatNumber ?? widget.prefilledSeat ?? '');
     _totalFeeCtrl = TextEditingController(text: m?.totalFee.toString() ?? '');
     _paidAmtCtrl = TextEditingController(text: m?.paidAmount.toString() ?? '');
     
@@ -120,6 +121,11 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
     final libName = prefs.getString('library_custom_business_name') ?? 'Our Library';
     final dateFormat = DateFormat('dd MMM yyyy');
     
+    // Validate phone for WhatsApp
+    final phone = member.whatsapp.isNotEmpty ? member.whatsapp : member.phone;
+    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+    final isPhoneValid = cleanPhone.length >= 10;
+    
     await showDialog(
       context: context,
       barrierDismissible: false,
@@ -142,56 +148,96 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
             const SizedBox(height: 8),
             Text('Seat: ${member.seatNumber.isEmpty ? 'N/A' : member.seatNumber}', style: const TextStyle(fontSize: 16)),
             const SizedBox(height: 8),
+            Text('Joining: ${dateFormat.format(DateTime.parse(member.joiningDate))}', style: const TextStyle(fontSize: 16)),
+            const SizedBox(height: 8),
             Text('Duration: ${dateFormat.format(DateTime.parse(member.startDate))} - ${dateFormat.format(DateTime.parse(member.expiryDate))}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.blueAccent)),
-          ],
-        ),
-        actions: [
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-                  child: const Text('Close'),
+            if (!isPhoneValid) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Invalid phone number — WhatsApp unavailable.',
+                        style: TextStyle(color: Colors.orange.shade800, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    final msg = '''Welcome to $libName! 🎉
+            ],
+          ],
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // WhatsApp button
+              ElevatedButton.icon(
+                onPressed: isPhoneValid
+                    ? () async {
+                        final msg = '''Welcome to $libName! 🎉
 
 👤 Name: ${member.name}
 ⏰ Timing: ${member.timing}
 🪑 Seat: ${member.seatNumber.isEmpty ? 'N/A' : member.seatNumber}
+📅 Joining: ${dateFormat.format(DateTime.parse(member.joiningDate))}
 📅 Duration: ${dateFormat.format(DateTime.parse(member.startDate))} to ${dateFormat.format(DateTime.parse(member.expiryDate))}
 
 Thank you for joining us!''';
-                    
-                    await WhatsappService.openWhatsApp(
-                      member.whatsapp.isNotEmpty ? member.whatsapp : member.phone, 
-                      msg
-                    );
-                    
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                    }
-                  },
-                  icon: const Icon(Icons.send_rounded, size: 20),
-                  label: const Text('WhatsApp'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green.shade600, 
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14)
-                  ),
+                        
+                        await WhatsappService.openWhatsApp(phone, msg);
+                        
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                        }
+                      }
+                    : null,
+                icon: const Icon(Icons.send_rounded, size: 20),
+                label: const Text('Send on WhatsApp'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade600, 
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey.shade300,
+                  disabledForegroundColor: Colors.grey.shade500,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
               ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                      child: const Text('Later'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                ],
+              ),
             ],
-          )
+          ),
         ],
       ),
     );
   }
+
 
   void _showQrDialog() {
     showDialog(

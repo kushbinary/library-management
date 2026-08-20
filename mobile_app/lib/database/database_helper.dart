@@ -143,7 +143,7 @@ class DatabaseHelper {
     if (migrated) return;
 
     final user = prefs.getString('current_logged_in_user') ?? 'admin';
-    final key = 'library_students_user_\${user.toLowerCase().trim()}';
+    final key = 'library_students_user_${user.toLowerCase().trim()}';
     
     final raw = prefs.getString(key);
     if (raw != null && raw.isNotEmpty) {
@@ -154,7 +154,7 @@ class DatabaseHelper {
           await db.insert('members', member.toJson(), conflictAlgorithm: ConflictAlgorithm.replace);
         }
       } catch (e) {
-        print("Migration error: \$e");
+        print("Migration error: $e");
       }
     }
     

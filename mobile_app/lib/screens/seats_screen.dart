@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/member.dart';
 import '../services/api_service.dart';
+import 'member_details_screen.dart';
+import 'add_member_screen.dart';
 
 class SeatsScreen extends StatefulWidget {
   const SeatsScreen({super.key});
@@ -78,10 +80,18 @@ class _SeatsScreenState extends State<SeatsScreen> {
                   onTap: () {
                     if (isOccupied) {
                       // Navigate to member details
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Seat \$seatNum is occupied by \${member.name}')));
+                      Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => MemberDetailsScreen(member: member),
+                      )).then((deleted) {
+                        if (deleted == true) _loadData();
+                      });
                     } else {
-                      // Navigate to add member with seatNum
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Seat \$seatNum is available.')));
+                      // Navigate to add member with pre-filled seat number
+                      Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => AddMemberScreen(prefilledSeat: seatNum),
+                      )).then((added) {
+                        if (added == true) _loadData();
+                      });
                     }
                   },
                   child: Container(

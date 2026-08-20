@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../models/member.dart';
 import '../services/api_service.dart';
 import 'add_member_screen.dart';
@@ -104,10 +105,10 @@ class _MembersScreenState extends State<MembersScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const SizedBox(height: 4),
-                          Text('Seat: \${member.seatNumber} • Phone: \${member.phone}'),
+                          Text('Seat: ${member.seatNumber} • Phone: ${member.phone}'),
                           const SizedBox(height: 2),
                           Text(
-                            member.isExpired ? 'Expired' : 'Expires: \${member.expiryDate}', 
+                            member.isExpired ? 'Expired' : 'Expires: ${_formatDate(member.expiryDate)}', 
                             style: TextStyle(
                               color: member.isExpired ? Colors.red : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                               fontWeight: member.isExpired ? FontWeight.bold : FontWeight.normal
@@ -129,5 +130,14 @@ class _MembersScreenState extends State<MembersScreen> {
               ),
           ),
     );
+  }
+
+  String _formatDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      return DateFormat('dd MMM yyyy').format(date);
+    } catch (_) {
+      return dateStr;
+    }
   }
 }

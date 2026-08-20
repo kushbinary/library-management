@@ -27,7 +27,7 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Member'),
-        content: Text('Are you sure you want to delete \${_member.name}?'),
+        content: Text('Are you sure you want to delete ${_member.name}?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           TextButton(
@@ -97,10 +97,10 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
             
             _buildInfoCard(cardColor, 'Membership Details', [
               _buildInfoRow(Icons.event_seat_rounded, 'Seat Number', _member.seatNumber),
-              _buildInfoRow(Icons.date_range_rounded, 'Joining Date', _member.joiningDate),
-              _buildInfoRow(Icons.play_circle_filled_rounded, 'Start Date', _member.startDate),
-              _buildInfoRow(Icons.pause_circle_filled_rounded, 'Expiry Date', _member.expiryDate),
-              _buildInfoRow(Icons.timer_rounded, 'Days Remaining', '\${_member.daysRemaining} days'),
+              _buildInfoRow(Icons.date_range_rounded, 'Joining Date', _formatDate(_member.joiningDate)),
+              _buildInfoRow(Icons.play_circle_filled_rounded, 'Start Date', _formatDate(_member.startDate)),
+              _buildInfoRow(Icons.pause_circle_filled_rounded, 'Expiry Date', _formatDate(_member.expiryDate)),
+              _buildInfoRow(Icons.timer_rounded, 'Days Remaining', '${_member.daysRemaining} days'),
             ]),
             
             _buildInfoCard(cardColor, 'Financials', [
@@ -154,5 +154,14 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
         ],
       ),
     );
+  }
+
+  String _formatDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      return DateFormat('dd MMM yyyy').format(date);
+    } catch (_) {
+      return dateStr;
+    }
   }
 }

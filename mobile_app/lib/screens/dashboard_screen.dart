@@ -4,6 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/member.dart';
 import '../services/api_service.dart';
 import 'add_member_screen.dart';
+import 'collect_fee_screen.dart';
+import 'seats_screen.dart';
+import 'attendance_screen.dart';
+import 'profile_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -100,15 +104,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('\$greeting, \$_currentUser 👋', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+            Text('$greeting, $_currentUser 👋', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
             const SizedBox(height: 4),
             Text(today, style: TextStyle(fontSize: 14, color: Colors.grey.shade500, fontWeight: FontWeight.w500)),
           ],
         ),
-        CircleAvatar(
-          radius: 24,
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          child: Icon(Icons.person, color: Theme.of(context).colorScheme.primary),
+        GestureDetector(
+          onTap: () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())).then((_) => _loadData());
+          },
+          child: CircleAvatar(
+            radius: 24,
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            child: Icon(Icons.person, color: Theme.of(context).colorScheme.primary),
+          ),
         ),
       ],
     );
@@ -121,10 +130,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       mainAxisSpacing: 16,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.4,
+      childAspectRatio: 1.15,
       children: [
         _buildStatCard('Total Members', _totalMembers.toString(), Icons.people_alt_rounded, Colors.blue),
-        _buildStatCard('Available Seats', '\$_availableSeats / \$_totalSeats', Icons.chair_alt_rounded, Colors.green),
+        _buildStatCard('Available Seats', '$_availableSeats / $_totalSeats', Icons.chair_alt_rounded, Colors.green),
         _buildStatCard('Pending Fees', currencyFormat.format(_totalDue), Icons.account_balance_wallet_rounded, Colors.orange),
         _buildStatCard('Expiring Soon', _expiringSoon.toString(), Icons.warning_rounded, Colors.red),
       ],
@@ -160,9 +169,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+          FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900))),
           const SizedBox(height: 4),
-          Text(title, style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
+          FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(title, style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.w600))),
         ],
       ),
     );
@@ -183,13 +192,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
                  final added = await Navigator.push(context, MaterialPageRoute(builder: (_) => const AddMemberScreen()));
                  if (added == true) _loadData();
               }),
-              _buildActionButton(context, 'Collect Fee', Icons.payment_rounded, Colors.teal, () {}),
-              _buildActionButton(context, 'Seat Map', Icons.grid_view_rounded, Colors.blueGrey, () {}),
-              _buildActionButton(context, 'Attendance', Icons.fact_check_rounded, Colors.deepPurple, () {}),
+              _buildActionButton(context, 'Collect Fee', Icons.payment_rounded, Colors.teal, () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const CollectFeeScreen())).then((_) => _loadData());
+              }),
+              _buildActionButton(context, 'Seat Map', Icons.grid_view_rounded, Colors.blueGrey, () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const SeatsScreen()));
+              }),
+              _buildActionButton(context, 'Attendance', Icons.fact_check_rounded, Colors.deepPurple, () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const AttendanceScreen()));
+              }),
             ],
           ),
         ),
+        const SizedBox(height: 24),
+        const Text('Recent Activities', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 16),
+        _buildRecentActivitiesPlaceholder(),
       ],
+    );
+  }
+
+  Widget _buildRecentActivitiesPlaceholder() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.history_rounded, size: 40, color: Colors.grey.shade400),
+          const SizedBox(height: 12),
+          Text('No recent activities yet', style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w500)),
+        ],
+      ),
     );
   }
 
@@ -206,13 +244,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Container(
               width: 60, height: 60,
               decoration: BoxDecoration(
-                color: isDark ? color.shade900.withValues(alpha: 0.3) : color.shade100.withValues(alpha: 0.5),
+                gradient: LinearGradient(
+                  colors: isDark 
+                      ? [color.shade900, color.shade800] 
+                      : [color.shade50, color.shade100],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(color: color.withValues(alpha: 0.2), blurRadius: 8, offset: const Offset(0, 4))
+                ],
               ),
               child: Icon(icon, color: isDark ? color.shade200 : color.shade700, size: 28),
             ),
             const SizedBox(height: 8),
-            Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            FittedBox(fit: BoxFit.scaleDown, child: Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
           ],
         ),
       ),
@@ -228,11 +275,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const Text('Attention Required', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
         if (_expiringSoon > 0)
-          _buildAlertItem(Icons.warning_amber_rounded, Colors.orange, '\$_expiringSoon memberships expiring within 5 days.'),
+          _buildAlertItem(Icons.warning_amber_rounded, Colors.orange, '$_expiringSoon memberships expiring within 5 days.'),
         if (_expiredMembers > 0)
-          _buildAlertItem(Icons.error_outline_rounded, Colors.red, '\$_expiredMembers expired memberships.'),
+          _buildAlertItem(Icons.error_outline_rounded, Colors.red, '$_expiredMembers expired memberships.'),
         if (_totalDue > 0)
-          _buildAlertItem(Icons.account_balance_wallet_rounded, Colors.deepOrange, 'Pending fees: \${currencyFormat.format(_totalDue)}'),
+          _buildAlertItem(Icons.account_balance_wallet_rounded, Colors.deepOrange, 'Pending fees: ${currencyFormat.format(_totalDue)}'),
       ],
     );
   }
