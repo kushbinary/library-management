@@ -36,7 +36,7 @@ class ApiService {
     try {
       final baseUrl = await getBaseUrl();
       final response = await http.post(
-        Uri.parse('\$baseUrl/signup'),
+        Uri.parse('$baseUrl/signup'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'username': username.trim(),
@@ -70,7 +70,7 @@ class ApiService {
     try {
       final baseUrl = await getBaseUrl();
       final response = await http.post(
-        Uri.parse('\$baseUrl/login'),
+        Uri.parse('$baseUrl/login'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'username': username.trim(),
@@ -153,13 +153,13 @@ class ApiService {
       
       if (isNew) {
         await http.post(
-          Uri.parse('\$baseUrl/students'),
+          Uri.parse('$baseUrl/students'),
           headers: {'Content-Type': 'application/json', 'X-Username': user},
           body: json.encode(payload),
         ).timeout(const Duration(seconds: 15));
       } else {
         await http.put(
-          Uri.parse('\$baseUrl/students/\${member.id}'),
+          Uri.parse('$baseUrl/students/${member.id}'),
           headers: {'Content-Type': 'application/json', 'X-Username': user},
           body: json.encode(payload),
         ).timeout(const Duration(seconds: 15));
@@ -173,7 +173,7 @@ class ApiService {
     try {
       final baseUrl = await getBaseUrl();
       await http.delete(
-        Uri.parse('\$baseUrl/students/\$id?username=\${Uri.encodeComponent(username)}'),
+        Uri.parse('$baseUrl/students/$id?username=${Uri.encodeComponent(username)}'),
         headers: {'Accept': 'application/json', 'X-Username': username},
       ).timeout(const Duration(seconds: 15));
     } catch (_) {
@@ -195,6 +195,6 @@ class ApiService {
         }
       } catch (_) {}
     }
-    return {'message': 'Sent WhatsApp reminders to \$count expired member(s)!'};
+    return {'message': 'Sent WhatsApp reminders to $count expired member(s)!'};
   }
 }
