@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_navigation.dart';
 import 'screens/settings_screen.dart';
 import 'services/whatsapp_service.dart';
 import 'services/settings_manager.dart';
@@ -164,7 +164,7 @@ class LibraryApp extends StatelessWidget {
           initialRoute: '/',
           routes: {
             '/': (context) => const LoginScreen(),
-            '/home': (context) => const HomeScreen(),
+            '/home': (context) => const MainNavigation(),
             '/settings': (context) => const SettingsScreen(),
           },
           debugShowCheckedModeBanner: false,
