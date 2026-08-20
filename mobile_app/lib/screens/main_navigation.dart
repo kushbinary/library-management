@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dashboard_screen.dart';
 import 'members_screen.dart';
 import 'settings_screen.dart';
+import 'reports_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -16,7 +17,7 @@ class _MainNavigationState extends State<MainNavigation> {
   final List<Widget> _screens = [
     const DashboardScreen(),
     const MembersScreen(),
-    const Scaffold(body: Center(child: Text("Reports (Coming Soon)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)))),
+    const ReportsScreen(),
     const SettingsScreen(),
   ];
 

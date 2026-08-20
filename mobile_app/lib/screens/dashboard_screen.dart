@@ -150,6 +150,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return sorted.take(5).toList();
   }
 
+  Widget _buildAvatarCard(String url, bool isMale, String title, String subtitle, BuildContext ctx) {
+    return GestureDetector(
+      onTap: () {
+        _setAvatar(url);
+        Navigator.pop(ctx);
+      },
+      child: Container(
+        width: 140,
+        margin: const EdgeInsets.only(right: 15, bottom: 15, left: 5, top: 5),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          border: _avatarUrl == url ? Border.all(color: isMale ? const Color(0xFF007bff) : const Color(0xFFe83e8c), width: 2) : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isMale ? const Color(0xFF007bff) : const Color(0xFFe83e8c),
+                  width: 3,
+                ),
+                color: const Color(0xFFeef2f3),
+                image: DecorationImage(
+                  image: NetworkImage(url),
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(title, style: const TextStyle(color: Color(0xFF333333), fontWeight: FontWeight.bold, fontSize: 14)),
+            const SizedBox(height: 4),
+            Text(subtitle, style: const TextStyle(color: Color(0xFF777777), fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bgGradient = const LinearGradient(
@@ -265,7 +316,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onTap: () {
                 showModalBottomSheet(
                   context: context,
-                  backgroundColor: const Color(0xFF1E293B),
+                  backgroundColor: const Color(0xFFF4F7F6),
                   isScrollControlled: true,
                   shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
                   builder: (ctx) => Padding(
@@ -273,40 +324,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text('Choose Avatar', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        const Text('Choose Avatar', style: TextStyle(color: Color(0xFF333333), fontSize: 20, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 20),
-                        const Text('Male', style: TextStyle(color: Colors.white70, fontSize: 14)),
-                        const SizedBox(height: 10),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: _maleAvatars.map((url) => GestureDetector(
-                            onTap: () {
-                              _setAvatar(url);
-                              Navigator.pop(ctx);
-                            },
-                            child: CircleAvatar(
-                              radius: 30,
-                              backgroundImage: NetworkImage(url),
-                              backgroundColor: _avatarUrl == url ? Colors.indigo : Colors.transparent,
-                            ),
-                          )).toList(),
+                        const Text('Male Profiles', style: TextStyle(color: Color(0xFF555555), fontSize: 16, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 12),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          child: Row(
+                            children: _maleAvatars.map((url) => _buildAvatarCard(url, true, 'Admin', 'Male Profile', ctx)).toList(),
+                          ),
                         ),
                         const SizedBox(height: 20),
-                        const Text('Female', style: TextStyle(color: Colors.white70, fontSize: 14)),
-                        const SizedBox(height: 10),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: _femaleAvatars.map((url) => GestureDetector(
-                            onTap: () {
-                              _setAvatar(url);
-                              Navigator.pop(ctx);
-                            },
-                            child: CircleAvatar(
-                              radius: 30,
-                              backgroundImage: NetworkImage(url),
-                              backgroundColor: _avatarUrl == url ? Colors.pink : Colors.transparent,
-                            ),
-                          )).toList(),
+                        const Text('Female Profiles', style: TextStyle(color: Color(0xFF555555), fontSize: 16, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 12),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          child: Row(
+                            children: _femaleAvatars.map((url) => _buildAvatarCard(url, false, 'Admin', 'Female Profile', ctx)).toList(),
+                          ),
                         ),
                         const SizedBox(height: 20),
                       ],
