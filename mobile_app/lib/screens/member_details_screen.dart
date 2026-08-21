@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/member.dart';
 import '../services/api_service.dart';
 import 'package:intl/intl.dart';
+import 'add_member_screen.dart';
 
 class MemberDetailsScreen extends StatefulWidget {
   final Member member;
@@ -54,7 +55,18 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
       appBar: AppBar(
         title: const Text('Member Details'),
         actions: [
-          IconButton(icon: const Icon(Icons.edit_rounded), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.edit_rounded),
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => AddMemberScreen(member: _member)),
+              );
+              if (result == true && mounted) {
+                Navigator.pop(context, true); // Pop back to list and trigger reload
+              }
+            },
+          ),
           IconButton(icon: const Icon(Icons.delete_rounded, color: Colors.redAccent), onPressed: _deleteMember),
         ],
       ),

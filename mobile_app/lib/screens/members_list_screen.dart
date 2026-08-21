@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import 'add_member_screen.dart';
 import 'member_details_screen.dart';
+import '../utils/constants.dart';
 
 class MembersScreen extends StatefulWidget {
   const MembersScreen({super.key});
@@ -123,9 +124,24 @@ class _MembersScreenState extends State<MembersScreen> {
                           IconButton(
                             icon: Icon(Icons.wechat_rounded, color: Colors.green.shade600),
                             onPressed: () async {
-                              final phone = member.phone;
-                              final message = 'Hello ${member.name}, your library membership has expired or is expiring soon on ${_formatDate(member.expiryDate)}. Please renew to continue using our services.';
-                              final url = 'https://wa.me/91$phone?text=${Uri.encodeComponent(message)}';
+                              String phone = member.whatsapp.isNotEmpty ? member.whatsapp : member.phone;
+                              phone = phone.replaceAll(RegExp(r'\D'), '');
+                              if (phone.length == 10) {
+                                phone = '91$phone';
+                              } else if (phone.startsWith('0') && phone.length == 11) {
+                                phone = '91${phone.substring(1)}';
+                              }
+
+                              String message;
+                              if (member.isExpired) {
+                                message = AppConstants.getExpiredMessage(member.name, member.seatNumber.isNotEmpty ? member.seatNumber : 'N/A');
+                              } else if (member.daysRemaining > 0 && member.daysRemaining <= AppConstants.expiringSoonThresholdDays) {
+                                message = AppConstants.getExpiringSoonMessage(member.name, _formatDate(member.expiryDate), member.daysRemaining);
+                              } else {
+                                message = AppConstants.getActiveMessage(member.name, 'MyLibrary'); // Hardcoded name for now, can be fetched from preferences
+                              }
+
+                              final url = 'https://wa.me/$phone?text=${Uri.encodeComponent(message)}';
                               if (await canLaunchUrl(Uri.parse(url))) {
                                 await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
                               }

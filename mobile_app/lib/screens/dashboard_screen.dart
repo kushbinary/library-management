@@ -8,6 +8,7 @@ import 'collect_fee_screen.dart';
 import 'seats_screen.dart';
 import 'attendance_screen.dart';
 import 'profile_screen.dart';
+import 'income_details_screen.dart';
 import 'members_list_screen.dart';
 import '../database/database_helper.dart';
 
@@ -23,6 +24,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoading = true;
   String _currentUser = 'Admin';
   double _currentMonthIncome = 0.0;
+  double _currentMonthCash = 0.0;
+  double _currentMonthOnline = 0.0;
   
   final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
@@ -42,12 +45,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final payments = await DatabaseHelper().getAllPayments();
     final now = DateTime.now();
     double currentMonthTotal = 0;
+    double currentMonthCash = 0;
+    double currentMonthOnline = 0;
     for (var payment in payments) {
       if (payment.status.toLowerCase() == 'paid') {
         try {
           final date = DateTime.parse(payment.date);
           if (date.year == now.year && date.month == now.month) {
             currentMonthTotal += payment.amount;
+            if (payment.method.toLowerCase() == 'cash') {
+              currentMonthCash += payment.amount;
+            } else {
+              currentMonthOnline += payment.amount;
+            }
           }
         } catch (_) {}
       }
@@ -58,6 +68,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _currentUser = user;
         _members = members;
         _currentMonthIncome = currentMonthTotal;
+        _currentMonthCash = currentMonthCash;
+        _currentMonthOnline = currentMonthOnline;
         _isLoading = false;
       });
     }
@@ -154,14 +166,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _buildStatCard('Total Members', _totalMembers.toString(), Icons.people_alt_rounded, Colors.blue, onTap: () {
           Navigator.push(context, MaterialPageRoute(builder: (_) => const MembersScreen())).then((_) => _loadData());
         }),
-        _buildStatCard('Income (This Month)', currencyFormat.format(_currentMonthIncome), Icons.trending_up_rounded, Colors.teal),
+        _buildStatCard(
+          'Income (This Month)', 
+          currencyFormat.format(_currentMonthIncome), 
+          Icons.trending_up_rounded, 
+          Colors.teal,
+          subtext: 'Cash: ${currencyFormat.format(_currentMonthCash)} | Online: ${currencyFormat.format(_currentMonthOnline)}',
+          onTap: () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const IncomeDetailsScreen())).then((_) => _loadData());
+          }
+        ),
         _buildStatCard('Available Seats', '$_availableSeats / $_totalSeats', Icons.chair_alt_rounded, Colors.green),
         _buildStatCard('Pending Fees', currencyFormat.format(_totalDue), Icons.account_balance_wallet_rounded, Colors.orange),
       ],
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, MaterialColor color, {VoidCallback? onTap}) {
+  Widget _buildStatCard(String title, String value, IconData icon, MaterialColor color, {VoidCallback? onTap, String? subtext}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = isDark ? color.shade900.withValues(alpha: 0.2) : color.shade50;
     final iconColor = isDark ? color.shade300 : color.shade700;
@@ -195,6 +216,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900))),
           const SizedBox(height: 4),
           FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(title, style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.w600))),
+          if (subtext != null) ...[
+            const SizedBox(height: 2),
+            FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(subtext, style: TextStyle(fontSize: 10, color: color.shade500, fontWeight: FontWeight.bold))),
+          ],
         ],
       ),
     ),

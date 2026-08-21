@@ -289,7 +289,12 @@ Thank you for joining us!''';
                     controller: _phoneCtrl,
                     keyboardType: TextInputType.phone,
                     decoration: const InputDecoration(labelText: 'Phone Number', prefixIcon: Icon(Icons.phone)),
-                    validator: (v) => v!.isEmpty ? 'Required' : null,
+                    validator: (v) {
+                      if (v!.isEmpty) return 'Required';
+                      final digitsOnly = v.replaceAll(RegExp(r'\D'), '');
+                      if (digitsOnly.length < 10) return 'Enter a valid 10-digit number';
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 8),
                   CheckboxListTile(
