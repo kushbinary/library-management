@@ -8,6 +8,8 @@ import 'collect_fee_screen.dart';
 import 'seats_screen.dart';
 import 'attendance_screen.dart';
 import 'profile_screen.dart';
+import 'members_list_screen.dart';
+import '../database/database_helper.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -20,6 +22,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Member> _members = [];
   bool _isLoading = true;
   String _currentUser = 'Admin';
+  double _currentMonthIncome = 0.0;
   
   final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
@@ -35,10 +38,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final user = prefs.getString('current_logged_in_user') ?? 'Admin';
     final members = await ApiService.getStudents();
     
+    // Calculate current month's income
+    final payments = await DatabaseHelper().getAllPayments();
+    final now = DateTime.now();
+    double currentMonthTotal = 0;
+    for (var payment in payments) {
+      if (payment.status.toLowerCase() == 'paid') {
+        try {
+          final date = DateTime.parse(payment.date);
+          if (date.year == now.year && date.month == now.month) {
+            currentMonthTotal += payment.amount;
+          }
+        } catch (_) {}
+      }
+    }
+    
     if (mounted) {
       setState(() {
         _currentUser = user;
         _members = members;
+        _currentMonthIncome = currentMonthTotal;
         _isLoading = false;
       });
     }
@@ -132,20 +151,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
       physics: const NeverScrollableScrollPhysics(),
       childAspectRatio: 1.15,
       children: [
-        _buildStatCard('Total Members', _totalMembers.toString(), Icons.people_alt_rounded, Colors.blue),
+        _buildStatCard('Total Members', _totalMembers.toString(), Icons.people_alt_rounded, Colors.blue, onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const MembersScreen())).then((_) => _loadData());
+        }),
+        _buildStatCard('Income (This Month)', currencyFormat.format(_currentMonthIncome), Icons.trending_up_rounded, Colors.teal),
         _buildStatCard('Available Seats', '$_availableSeats / $_totalSeats', Icons.chair_alt_rounded, Colors.green),
         _buildStatCard('Pending Fees', currencyFormat.format(_totalDue), Icons.account_balance_wallet_rounded, Colors.orange),
-        _buildStatCard('Expiring Soon', _expiringSoon.toString(), Icons.warning_rounded, Colors.red),
       ],
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, MaterialColor color) {
+  Widget _buildStatCard(String title, String value, IconData icon, MaterialColor color, {VoidCallback? onTap}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = isDark ? color.shade900.withValues(alpha: 0.2) : color.shade50;
     final iconColor = isDark ? color.shade300 : color.shade700;
 
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color,
@@ -174,6 +197,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(title, style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.w600))),
         ],
       ),
+    ),
     );
   }
 

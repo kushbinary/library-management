@@ -50,3 +50,32 @@ Thumbs.db
 # Database files
 *.sqlite3
 backend/library.db
+
+# --- Additional Standard Ignores ---
+# Python (Testing & Build)
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+*.egg-info/
+
+# Flutter & Dart (Additional)
+.pub-cache/
+.pub/
+/coverage/
+*.aab
+
+# Node.js (Additional Logs)
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS Specific Metadata (Mac/Windows)
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+desktop.ini
+$RECYCLE.BIN/

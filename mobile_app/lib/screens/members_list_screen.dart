@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/member.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import 'add_member_screen.dart';
 import 'member_details_screen.dart';
@@ -116,7 +117,23 @@ class _MembersScreenState extends State<MembersScreen> {
                           ),
                         ],
                       ),
-                      trailing: const Icon(Icons.chevron_right_rounded),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.wechat_rounded, color: Colors.green.shade600),
+                            onPressed: () async {
+                              final phone = member.phone;
+                              final message = 'Hello ${member.name}, your library membership has expired or is expiring soon on ${_formatDate(member.expiryDate)}. Please renew to continue using our services.';
+                              final url = 'https://wa.me/91$phone?text=${Uri.encodeComponent(message)}';
+                              if (await canLaunchUrl(Uri.parse(url))) {
+                                await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                              }
+                            },
+                          ),
+                          const Icon(Icons.chevron_right_rounded),
+                        ],
+                      ),
                       onTap: () {
                         Navigator.push(context, MaterialPageRoute(
                           builder: (_) => MemberDetailsScreen(member: member)
